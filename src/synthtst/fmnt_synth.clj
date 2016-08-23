@@ -147,18 +147,18 @@
 
 (defn make-synth
   "creates fmnt5 synths and adds it to synths"
-  [synth]
-  (reset! synths (conj @synths (synth))
+  [synth freq]
+  (reset! synths (conj @synths (synth :freq-bus freq))
           )
   )
 
 (defn make-synths
-  [synth & {:keys [t cnt] :or {t (now) cnt 0}}]
+  [synth & {:keys [freq-b t cnt] :or {freq-b pitch-bus t (now) cnt 0}}]
   (let [next-t (+ t 200)]
-    (make-synth synth)
+    (make-synth synth freq-b)
     (if (< cnt 7) (apply-at next-t
                             #'make-synths
-                            [synth :t next-t :cnt (inc cnt)]))
+                            [synth :freq-b freq-b :t next-t :cnt (inc cnt)]))
     )
   )
 
