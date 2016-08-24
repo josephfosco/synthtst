@@ -116,12 +116,15 @@
   )
 
 (definst fmnt6 [freq-bus 0 cfreq 880 bw 200.0
-                max-impulse 3.0 min-impulse 5.0
+                max-impulse 5.0 min-impulse 3.0
                 max-cfreq 2000 freq-cfreq 11
                 min-bw 10 max-bw 1000 freq-bw 10
                 attack 0.0 release 0.001
                 vol 0.1]
-  (let [env-impulse (impulse (range-lin (lf-noise0:kr 0.5) max-impulse min-impulse))
+  (let [note-len (overtone.sc.ugen-collide/+ attack release)
+        env-impulse (impulse (range-lin (lf-noise0:kr 0.5)
+                                        (/ 1 (* (max 1 (round (/ 0.3 note-len) 1)) (+ note-len 0.05)))
+                                        (/ 1.1 (+ note-len 0.05))))
         env-ff (toggle-ff env-impulse)
         env-gate (gate env-ff env-impulse)
         envelope-generator (env-gen (perc attack release) env-gate 1 0 1)
