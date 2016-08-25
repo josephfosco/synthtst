@@ -123,7 +123,9 @@
                 vol 0.1]
   (let [note-len (overtone.sc.ugen-collide/+ attack release)
         env-impulse (impulse (range-lin (lf-noise0:kr 0.5)
-                                        (/ 1 (* (max 1 (round (/ 0.3 note-len) 1)) (+ note-len 0.05)))
+                                        (/ 1
+                                           (* (max 1 (round (/ 0.3 note-len) 1))
+                                              (+ note-len (min 0.2 (/ 0.025 note-len)))))
                                         (/ 1.1 (+ note-len 0.05))))
         env-ff (toggle-ff env-impulse)
         env-gate (gate env-ff env-impulse)
