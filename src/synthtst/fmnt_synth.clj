@@ -65,11 +65,11 @@
 (defonce pitch-bus (control-bus))
 
 (defsynth pitch-osc
-  [out-bus 0 freq 0.25 min-pitch 100 max-pitch 2000]
+  [out-bus 0 freq 0.25 min-pitch 50 max-pitch 1400]
   (out:kr out-bus (lin-exp (lf-noise1:kr freq) -1 1 min-pitch max-pitch ))
   )
 
-(def pitch-cntl (pitch-osc :out-bus pitch-bus :freq 2.0))
+(def pitch-cntl (pitch-osc :out-bus pitch-bus :freq 1.5))
 
 (definst fmnt4 [freq-bus 0 cfreq 880 bw 200.0
                 min-cfreq -75 max-cfreq 75 freq-cfreq 100
@@ -138,7 +138,7 @@
         ]
     (* (formant pitch
                 (+ pitch (range-lin (lf-noise1:kr freq-cfreq)
-                                    (* (/ pitch-base 2) -1)
+                                    (* (/ pitch-base 1.2) -1)
                                     max-cfreq))
                 (range-lin (lf-noise1:kr freq-bw) min-bw max-bw)
                 )
@@ -158,10 +158,11 @@
   )
 
 (defn make-synths
-  [synth & {:keys [freq-b t cnt] :or {freq-b pitch-bus t (now) cnt 0}}]
+  [synth & {:keys [freq-b t num-synths cnt]
+            :or {freq-b pitch-bus t (now) num-synths 7 cnt 0}}]
   (let [next-t (+ t 200)]
     (make-synth synth freq-b)
-    (if (< cnt 7) (apply-at next-t
+    (if (< cnt num-synths) (apply-at next-t
                             #'make-synths
                             [synth :freq-b freq-b :t next-t :cnt (inc cnt)]))
     )
