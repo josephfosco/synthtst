@@ -34,6 +34,9 @@
     )
   )
 
+(def f1 (fmnt))
+(stop)
+
 (definst fmnt2 [freq 440 cfreq 880 bw 200.0 gate-val 0
                 attack 0.05 release 0.3 vol 0.3]
   (let [env-generator (env-gen (perc attack release) gate-val 1 0 1 NO-ACTION)
@@ -45,6 +48,11 @@
        )
     )
   )
+
+(def f2 (fmnt2))
+(ctl fmnt2 :gate-val 1)
+(ctl fmnt2 :gate-val 0)
+(stop)
 
 (definst fmnt3 [freq 440 cfreq 880 bw 200.0 gate-val 0
                 attack 0.1 sustain 0.6 release 0.7  vol 0.3]
@@ -59,6 +67,11 @@
        )
     )
   )
+
+(def f3 (fmnt3))
+(ctl fmnt3 :gate-val 1)
+(ctl fmnt3 :gate-val 0)
+(stop)
 
 ;;; using a bus for base pitch
 
@@ -75,7 +88,7 @@
                 min-cfreq -75 max-cfreq 75 freq-cfreq 100
                 min-bw 10 max-bw 500 freq-bw 50
                 attack 0.01 release 0.05
-                vol 0.1]
+                vol 1]
 
   (let [env-impulse (impulse (range-lin (lf-noise0:kr 0.5) 3.0 5.0))
         env-ff (toggle-ff env-impulse)
@@ -92,11 +105,14 @@
     )
   )
 
+(def f4 (fmnt4))
+(stop)
+
 (definst fmnt5 [freq-bus 0 cfreq 880 bw 200.0
                 min-cfreq -75 max-cfreq 75 freq-cfreq 100
                 min-bw 10 max-bw 500 freq-bw 50
                 attack 0.0 release 0.001
-                vol 0.1]
+                vol 1]
 
   (let [env-impulse (impulse (range-lin (lf-noise0:kr 0.5) 3.0 5.0))
         env-ff (toggle-ff env-impulse)
@@ -115,12 +131,15 @@
     )
   )
 
+(def f5 (fmnt5))
+(stop)
+
 (definst fmnt6 [freq-bus 0 cfreq 880 bw 200.0
                 max-impulse 3.0 min-impulse 5.0
                 max-cfreq 2000 freq-cfreq 11
                 min-bw 10 max-bw 1000 freq-bw 10
                 attack 0.0 release 0.001
-                vol 0.1]
+                vol 1]
   (let [env-impulse (impulse (range-lin (lf-noise0:kr 0.5) max-impulse min-impulse))
         env-ff (toggle-ff env-impulse)
         env-gate (gate env-ff env-impulse)
@@ -143,6 +162,9 @@
     )
   )
 
+(def f6 (fmnt6))
+(stop)
+
 (def synths (atom ()))
 
 (defn make-synth
@@ -161,6 +183,9 @@
                             [synth :t next-t :cnt (inc cnt)]))
     )
   )
+
+(make-synths fmnt5)
+(stop)
 
 (defn set-synth-val
   [parm val]
@@ -198,6 +223,8 @@
     )
   )
 
+(play 45)
+
 (defn playl
   [t pitch]
   (play pitch)
@@ -205,4 +232,7 @@
         next-p (if (< pitch 100) (+ pitch 1) 28)]
     (apply-at next-t #'playl [next-t next-p]
     )
-  ))
+    ))
+
+(playl 0 45)
+(stop)
