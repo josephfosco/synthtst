@@ -223,7 +223,7 @@
     )
   )
 
-(play 45)
+(play 67)
 
 (defn playl
   [t pitch]

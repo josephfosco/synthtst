@@ -216,8 +216,8 @@
                     )
                    (+ (* 0.03
                          (hpf
-                          (lpf (white-noise)
-                               (+ (env-gen (perc 1.5 6 :curve [2 2]) gate 5000 0 1 NO-ACTION)
+                          (lpf (pink-noise)
+                               (+ (env-gen (perc 1.5 6 :curve [2 2]) gate 7000 0 1 NO-ACTION)
                                   (+ (* (+ (sin-osc:kr 2.5) 1.8) 300)
                                      vib-eg)
                                   ))
@@ -299,7 +299,7 @@
 (stop)
 
 (defsynth bells
-  [freq 440 vol 1 attack 0.001 release 3 gate 1.0]
+  [freq 440 vol 1 attack 0.001 release 6 gate 1.0]
   (let[eg  (env-gen (perc attack release :curve [0 -3]) gate 0.2 0 1 FREE)
        osc1 (lf-tri :freq freq)
        osc2 (lf-tri :freq (* 2.3784 freq))
@@ -319,197 +319,93 @@
 (def bl (bells))
 (stop)
 
+(defsynth sparks
+  [gate 1 attack 0.001 release 0.001 gate 0 action NO-ACTION]
+  (let [eg (env-gen (perc attack release) gate 1 0 1 action)
+        cutoff-min 800
+        cutoff-max 10000
+        ]
+    (out [0 1]
+         (-> eg
+             (* (rhpf
+                 (white-noise)
+                 (+ (/ (* (- cutoff-max cutoff-min) (- (lf-noise1:kr 10) -1)) (- 1 -1)) cutoff-min)
+                 (/ (+ 1 (lf-noise1:kr 12)) 2) ;; scale between 0 an 1
+                 ))
+             )
+         )
+    )
+  )
 
+(def spk (sparks :release 0.05 :gate 1 :action FREE))
+(ctl spk :gate 0)
+(ctl spk :gate 1)
 
+(defn play-spark
+  [spk play-again]
+  ;; (println "play-spark ****")
+  (when (not play-again) (println "STOPPING !!!!!!!!!"))
+  (let  [attack 0.001
+         release (+ 0.001 (* 0.001 (rand-int 49)))
+         action (if play-again NO-ACTION FREE)
+         release-time (+ (now) (int (* (+ attack release) 1000)) 100)
+         continue-playing (if (< (rand) 0.9) true false)
+         next-time (+ release-time 250 (rand-int 800))
+         ]
+    (ctl spk
+         :gate 1
+         :attack attack
+         :release release
+         :action action
+         )
+    (apply-at release-time
+              #'ctl spk [:gate 0]
+              )
 
+    (when play-again
+      (apply-at next-time
+                #'play-spark
+                spk continue-playing []
+                )
+      )
+    )
+  )
 
-;; (definst fmnt [freq 440 bw 200.0
-;;                attack 0.1 decay 0.2 sustain 0.6 release 0.7 vol 0.3]
-;;   (let [cfreq (* freq 1.37)
-;;         env-impulse (impulse 0.5)
-;;         env-ff (toggle-ff env-impulse)
-;;         env-gate (gate env-ff env-impulse)
-;;         env-generator (env-gen (env-adsr attack decay sustain release) env-gate 1 0 1)
-;;         ]
-;;     (* env-generator
-;;        (formant freq (+ cfreq (* (- env-generator 0.5) 1000)) (+ bw (* env-generator 500)))
-;;        vol
-;;        )
-;;     )
-;;   )
+(defn many-sparks
+  [num-sparks]
+  (let [all-sparks (for [s (range num-sparks)]
+                     (sparks :gate 0 :action NO-ACTION))
+        ]
+    (for [s all-sparks] (apply-at (+ (now) (+ 500 (rand 2000)))
+                                  #'play-spark
+                                  s true []
+                                  ))
+    )
+ )
 
-;; (def f1 (fmnt))
-;; (stop)
+(many-sparks 9)
+(stop)
 
-;; (definst fmnt2 [freq 440 cfreq 880 bw 200.0 gate-val 0
-;;                 attack 0.05 release 0.3 vol 0.3]
-;;   (let [env-generator (env-gen (perc attack release) gate-val 1 0 1 NO-ACTION)
-;;         ]
-;;     (* env-generator
-;;        ;;(formant freq cfreq (* bw (- env-generator 0.5)))
-;;        (formant freq cfreq bw)
-;;        vol
-;;        )
-;;     )
-;;   )
+(defsynth spark2
+  [gate 1 attack 0.001 release 0.001 gate 0 action NO-ACTION]
+  (let [eg (env-gen (perc attack release) gate 1 0 1 action)
+        cutoff-min 800
+        cutoff-max 10000
+        ]
+    (out [0 1]
+         (-> eg
+             (*
+              (+ (saw 220)
+               (rhpf
+                (white-noise)
+                (+ (/ (* (- cutoff-max cutoff-min) (- (lf-noise1:kr 10) -1)) (- 1 -1)) cutoff-min)
+                (/ (+ 1 (lf-noise1:kr 12)) 2) ;; scale between 0 an 1
+                )))
+             )
+         )
+    )
+  )
 
-;; (definst fmnt3 [freq 440 cfreq 880 bw 200.0 gate-val 0
-;;                 attack 0.1 sustain 0.6 release 0.7  vol 0.3]
-;;   (let [env-generator (env-gen (env-asr attack sustain release) gate-val 1 0 1 FREE)
-;;         ]
-;;     (* env-generator
-;;        ;;(formant freq cfreq (* bw (- env-generator 0.5)))
-;;        (formant (+ 1060 (* 1000 (lf-noise0:kr 1)))
-;;                 (+ 800 (* 1000 (lf-noise1:kr 20)))
-;;                 (+ 510 (* 500 (lf-noise0:kr 10))))
-;;        vol
-;;        )
-;;     )
-;;   )
-
-;; ;;; using a bus for base pitch
-
-;; (defonce pitch-bus (control-bus))
-
-;; (defsynth pitch-osc
-;;   [out-bus 0 freq 0.25 min-pitch 100 max-pitch 2000]
-;;   (out:kr out-bus (lin-exp (lf-noise1:kr freq) -1 1 min-pitch max-pitch ))
-;;   )
-
-;; (def pitch-cntl (pitch-osc :out-bus pitch-bus :freq 2.0))
-
-;; (definst fmnt4 [freq-bus 0 cfreq 880 bw 200.0
-;;                 min-cfreq -75 max-cfreq 75 freq-cfreq 100
-;;                 min-bw 10 max-bw 500 freq-bw 50
-;;                 attack 0.01 release 0.05
-;;                 vol 0.1]
-
-;;   (let [env-impulse (impulse (range-lin (lf-noise0:kr 0.5) 3.0 5.0))
-;;         env-ff (toggle-ff env-impulse)
-;;         env-gate (gate env-ff env-impulse)
-;;         envelope-generator (env-gen (perc attack release) env-gate 1 0 1)
-;;         pitch (+ (in:kr freq-bus) (range-lin (lf-noise0:kr 1) -50 50))
-;;         ]
-;;     (* (formant pitch
-;;                 (+ pitch (range-lin (lf-noise1:kr freq-cfreq) min-cfreq max-cfreq))
-;;                 (range-lin (lf-noise1:kr freq-bw) min-bw max-bw))
-;;        envelope-generator
-;;        vol
-;;        )
-;;     )
-;;   )
-
-;; (definst fmnt5 [freq-bus 0 cfreq 880 bw 200.0
-;;                 min-cfreq -75 max-cfreq 75 freq-cfreq 100
-;;                 min-bw 10 max-bw 500 freq-bw 50
-;;                 attack 0.0 release 0.001
-;;                 vol 0.1]
-
-;;   (let [env-impulse (impulse (range-lin (lf-noise0:kr 0.5) 3.0 5.0))
-;;         env-ff (toggle-ff env-impulse)
-;;         env-gate (gate env-ff env-impulse)
-;;         envelope-generator (env-gen (perc attack release) env-gate 1 0 1)
-;;         pitch (+ (gate (in:kr freq-bus) (pulse-divider env-impulse 2 2))
-;;                  (range-lin (lf-noise0:kr 0.25) -50 50))
-;;         ]
-;;     (* (formant pitch
-;;                 pitch
-;;                 300
-;;                 )
-;;        envelope-generator
-;;        vol
-;;        )
-;;     )
-;;   )
-
-;; (definst fmnt6 [freq-bus 0 cfreq 880 bw 200.0
-;;                 max-impulse 3.0 min-impulse 5.0
-;;                 max-cfreq 2000 freq-cfreq 11
-;;                 min-bw 10 max-bw 1000 freq-bw 10
-;;                 attack 0.0 release 0.001
-;;                 vol 0.1]
-;;   (let [env-impulse (impulse (range-lin (lf-noise0:kr 0.5) max-impulse min-impulse))
-;;         env-ff (toggle-ff env-impulse)
-;;         env-gate (gate env-ff env-impulse)
-;;         envelope-generator (env-gen (perc attack release) env-gate 1 0 1)
-;;         pitch-base (gate (in:kr freq-bus) (pulse-divider env-impulse 2 2))
-;;         pitch-offset (range-lin (lf-noise0:kr 0.25)
-;;                                 (* (/ pitch-base 4) -1)
-;;                                 (/ pitch-base 4))
-;;         pitch (+ pitch-base pitch-offset)
-;;         ]
-;;     (* (formant pitch
-;;                 (+ pitch (range-lin (lf-noise1:kr freq-cfreq)
-;;                                     (* (/ pitch-base 2) -1)
-;;                                     max-cfreq))
-;;                 (range-lin (lf-noise1:kr freq-bw) min-bw max-bw)
-;;                 )
-;;        envelope-generator
-;;        vol
-;;        )
-;;     )
-;;   )
-
-;; (def synths (atom ()))
-
-;; (defn make-synth
-;;   "creates fmnt5 synths and adds it to synths"
-;;   [synth]
-;;   (reset! synths (conj @synths (synth))
-;;           )
-;;   )
-
-;; (defn make-synths
-;;   [synth & {:keys [t cnt] :or {t (now) cnt 0}}]
-;;   (let [next-t (+ t 200)]
-;;     (make-synth synth)
-;;     (if (< cnt 7) (apply-at next-t
-;;                             #'make-synths
-;;                             [synth :t next-t :cnt (inc cnt)]))
-;;     )
-;;   )
-
-;; (defn set-synth-val
-;;   [parm val]
-;;   (dorun (map ctl @synths (repeat parm) (repeat val)))
-;;   )
-
-;; (defn change-synth-val
-;;   [t t-inc parm p-val p-inc p-max]
-;;   (set-synth-val parm p-val)
-;;   (let [next-t (+ t (* t-inc 1000))]
-;;     (if (or (and (pos? p-inc) (< p-val p-max))
-;;             (and (neg? p-inc) (> p-val p-max)))
-;;       (do
-;;         (println "p-val " p-val "p-max " p-max (> p-val p-max))
-;;         (apply-at next-t
-;;                   #'change-synth-val
-;;                   [next-t t-inc parm (+ p-val p-inc) p-inc p-max])
-;;         )
-;;       )
-;;     )
-;;   )
-
-;; (def synth2 (fmnt2))
-
-;; (defn play
-;;   [p]
-;;   (let [pitch (+ 28 (rand-int 100))
-;;         freq (midi->hz p)
-;;         cfreq (if (< pitch 80) (+ freq 500) 400)
-;;         bw 800
-;;         ]
-;;     (println p)
-;;     (ctl synth2 :freq freq :cfreq freq :gate-val 1 :bw bw)
-;;     (apply-at (+ (now) 50) ctl [synth2 :gate-val 0])
-;;     )
-;;   )
-
-;; (defn playl
-;;   [t pitch]
-;;   (play pitch)
-;;   (let [next-t (+ t 500)
-;;         next-p (if (< pitch 100) (+ pitch 1) 28)]
-;;     (apply-at next-t #'playl [next-t next-p]
-;;     )
-;;   ))
+(def spk (spark2 :release 0.05 :gate 1 :action FREE))
+(ctl spk :gate 0)
+(ctl spk :gate 1)
