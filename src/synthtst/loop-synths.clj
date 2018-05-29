@@ -391,21 +391,62 @@
   (let [eg (env-gen (perc attack release) gate 1 0 1 action)
         cutoff-min 800
         cutoff-max 10000
+        ;; freq (+ (/ (* (- cutoff-max cutoff-min) (- (lf-noise1:kr 10) -1)) (- 1 -1)) cutoff-min)
+        freq (+ (rand-int (- cutoff-max cutoff-min)) cutoff-min)
         ]
     (out [0 1]
          (-> eg
              (*
-              (+ (saw 220)
-               (rhpf
-                (white-noise)
-                (+ (/ (* (- cutoff-max cutoff-min) (- (lf-noise1:kr 10) -1)) (- 1 -1)) cutoff-min)
-                (/ (+ 1 (lf-noise1:kr 12)) 2) ;; scale between 0 an 1
-                )))
+              (+ (saw (/ freq 2))
+                 (rhpf
+                  (white-noise)
+                  freq
+                  (/ (+ 1 (lf-noise1:kr 0.5)) 2) ;; scale between 0 an 1
+                  )))
              )
          )
     )
   )
 
-(def spk (spark2 :release 0.05 :gate 1 :action FREE))
+(def spk (spark2 :release 0.2 :gate 1 :action FREE))
 (ctl spk :gate 0)
 (ctl spk :gate 1)
+
+(defsynth spark3
+  [gate 1 attack 0.001 release 0.001 gate 0 action NO-ACTION]
+  (let [eg (env-gen (perc attack release) gate 1 0 1 action)
+        cutoff-min 800
+        cutoff-max 10000
+        ]
+    (out [0 1]
+         (-> eg
+             (* (rhpf
+                 (white-noise)
+                 (latch:ar (+ (/ (* (- cutoff-max cutoff-min) (- (lf-noise1:kr 20) -1)) (- 1 -1)) cutoff-min)
+                        (lf-noise1:ar 100))
+                 ;; (/ (+ 1 (lf-noise1:kr 12)) 2) ;; scale between 0 an 1
+                 1.0
+                 ))
+             )
+         )
+    )
+  )
+
+(def spk (spark3 :release 0.1 :gate 1 :action FREE))
+(ctl spk :gate 0)
+(ctl spk :gate 1)
+
+(defn many-synths
+  [num-synths synth]
+  (let [all-synths (for [s (range num-synths)]
+                     (synth :gate 0 :action NO-ACTION))
+        ]
+    (for [s all-synths] (apply-at (+ (now) (+ 500 (rand 2000)))
+                                  #'play-spark
+                                  s true []
+                                  ))
+    )
+ )
+
+(many-synths 9 spark3)
+(stop)
