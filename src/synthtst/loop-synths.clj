@@ -412,13 +412,65 @@
 (ctl spk :gate 0)
 (ctl spk :gate 1)
 
-(defsynth spark3
-  [gate 1 attack 0.001 release 0.001 gate 0 action NO-ACTION]
+;;-----------------------------------------------------------
+;; Test audio bus
+
+(defonce main-tst-g (group "test main"))
+(defonce early-tst-g (group "early test group" :head main-tst-g))
+(defonce late-tst-g (group "late test group" :after early-tst-g))
+
+(defonce test-bus (audio-bus 1))
+(defsynth test-synth
+  []
+  (out [0 1]
+       (in (:id test-bus))
+       )
+  )
+(def test-synth-inst (test-synth [:tail late-tst-g]))
+
+(defsynth sin-test
+  []
+  (out:ar test-bus
+       (sin-osc)
+       )
+  )
+(def sin-test-inst (sin-test [:tail early-tst-g]))
+(stop)
+
+(definst sin2-tst
+  []
+  (sin-osc)
+  )
+
+(sin2-tst)
+(stop)
+
+
+;;-----------------------------------------------------------
+
+(defonce spark-main-g (group "spark-main"))
+(defonce spark-early-g (group "spark early" :head spark-main-g))
+(defonce spark-later-g (group "spark later" :after spark-early-g))
+
+(defonce spark3-bus (audio-bus 1 "spark-bus"))
+
+(defsynth spark3-synth
+  []
+  (out [0 1]
+       (in (:id spark3-bus))
+;;       (fx-compressor spark3-bus 0.85 1.0 0.5 10 40)
+       )
+  )
+
+(def spark3-synth-inst (spark3-synth [:tail spark-later-g]))
+
+(defsynth spark3-sound
+  [gate 1 attack 0.001 release 0.001 gate 0 action FREE]
   (let [eg (env-gen (perc attack release) gate 1 0 1 action)
         cutoff-min 800
         cutoff-max 10000
         ]
-    (out [0 1]
+    (out spark3-bus
          (-> eg
              (* (rhpf
                  (white-noise)
@@ -432,14 +484,14 @@
     )
   )
 
-(def spk (spark3 :release 0.1 :gate 1 :action FREE))
+(def spk (spark3-sound [:tail spark-early-g] :release 0.1 :gate 1 :action FREE))
 (ctl spk :gate 0)
 (ctl spk :gate 1)
 
 (defn many-synths
   [num-synths synth]
   (let [all-synths (for [s (range num-synths)]
-                     (synth :gate 0 :action NO-ACTION))
+                     (synth [:tail spark-early-g] :gate 0 :action NO-ACTION))
         ]
     (for [s all-synths] (apply-at (+ (now) (+ 500 (rand 2000)))
                                   #'play-spark
@@ -448,5 +500,10 @@
     )
  )
 
-(many-synths 9 spark3)
+(spark3-synth)
+(many-synths 9 spark3-sound)
+(stop)
+
+
+;;(def spark3-inst (spark3-sound-inst [:tail spark-early-g]))
 (stop)
