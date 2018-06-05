@@ -457,8 +457,8 @@
 (defsynth spark3-synth
   []
   (out [0 1]
-       (in (:id spark3-bus))
-;;       (fx-compressor spark3-bus 0.85 1.0 0.5 10 40)
+       ;; (compander (in spark3-bus) (in spark3-bus) 0.5 1.0 0.5 0.01 0.05)
+       (limiter (in spark3-bus) 0.9 0.01)
        )
   )
 
@@ -472,13 +472,18 @@
         ]
     (out spark3-bus
          (-> eg
-             (* (rhpf
-                 (white-noise)
-                 (latch:ar (+ (/ (* (- cutoff-max cutoff-min) (- (lf-noise1:kr 20) -1)) (- 1 -1)) cutoff-min)
-                        (lf-noise1:ar 100))
-                 ;; (/ (+ 1 (lf-noise1:kr 12)) 2) ;; scale between 0 an 1
-                 1.0
-                 ))
+             (*
+              (limiter
+               (rhpf
+                (white-noise)
+                (latch:ar (+ (/ (* (- cutoff-max cutoff-min) (- (lf-noise1:kr 20) -1)) (- 1 -1)) cutoff-min)
+                          (lf-noise1:ar 100))
+                (/ (+ 1 (lf-noise1:kr 12)) 2) ;; scale between 0 an 1
+                ;;1.0
+                )
+               0.8
+               0.01
+               ))
              )
          )
     )
@@ -488,22 +493,48 @@
 (ctl spk :gate 0)
 (ctl spk :gate 1)
 
+(defn play-synth
+  [synth play-again]
+  ;; (println "play-spark ****")
+  (when (not play-again) (println "STOPPING !!!!!!!!!"))
+  (let  [attack 0.001
+         release (+ 0.001 (* 0.001 (rand-int 49)))
+         action (if play-again NO-ACTION FREE)
+         release-time (+ (now) (int (* (+ attack release) 1000)) 100)
+         continue-playing (if (< (rand) 0.9) true false)
+         next-time (+ release-time 250 (rand-int 800))
+         ]
+    (ctl synth
+         :gate 1
+         :attack attack
+         :release release
+         :action action
+         )
+    (apply-at release-time
+              #'ctl synth [:gate 0]
+              )
+
+    (when play-again
+      (apply-at next-time
+                #'play-synth
+                synth
+                continue-playing []
+                )
+      )
+    )
+  )
+
 (defn many-synths
   [num-synths synth]
   (let [all-synths (for [s (range num-synths)]
                      (synth [:tail spark-early-g] :gate 0 :action NO-ACTION))
         ]
     (for [s all-synths] (apply-at (+ (now) (+ 500 (rand 2000)))
-                                  #'play-spark
+                                  #'play-synth
                                   s true []
                                   ))
     )
  )
 
-(spark3-synth)
-(many-synths 9 spark3-sound)
-(stop)
-
-
-;;(def spark3-inst (spark3-sound-inst [:tail spark-early-g]))
+(many-synths 30 spark3-sound)
 (stop)
