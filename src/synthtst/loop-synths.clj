@@ -476,12 +476,13 @@
               (limiter
                (rhpf
                 (white-noise)
-                (latch:ar (+ (/ (* (- cutoff-max cutoff-min) (- (lf-noise1:kr 20) -1)) (- 1 -1)) cutoff-min)
-                          (lf-noise1:ar 100))
+                (latch:ar (+ (/ (* (- cutoff-max cutoff-min)
+                                   (- (lf-noise1:kr 20) -1))
+                                (- 1 -1)) cutoff-min)
+                          (lf-noise1:kr 150))
                 (/ (+ 1 (lf-noise1:kr 12)) 2) ;; scale between 0 an 1
-                ;;1.0
                 )
-               0.8
+               1.0
                0.01
                ))
              )
@@ -498,7 +499,7 @@
   ;; (println "play-spark ****")
   (when (not play-again) (println "STOPPING !!!!!!!!!"))
   (let  [attack 0.001
-         release (+ 0.001 (* 0.001 (rand-int 49)))
+         release (+ 0.001 (* 0.001 (rand-int 39)))
          action (if play-again NO-ACTION FREE)
          release-time (+ (now) (int (* (+ attack release) 1000)) 100)
          continue-playing (if (< (rand) 0.9) true false)
