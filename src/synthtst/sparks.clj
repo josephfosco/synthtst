@@ -19,6 +19,24 @@
    )
   )
 
+(defn weighted-choice
+  "Makes a random selection based on a vector of weights.
+   Returns the index into the vector of the selection
+   Will throw an IndexOutOfBounds exception if the vector is empty
+
+   weight-vector - vector of the form [x1 x2 x3 x4 ....]
+                   where each entry is the relative weight of that entry"
+  [weight-vector]
+  (let [rand-num (rand (reduce + weight-vector))]
+    (loop [i 0 sum 0]
+      (if (< rand-num (+ (weight-vector i) sum))
+        i
+        (recur (inc i) (+ (weight-vector i) sum)))))
+  )
+
+(def release-weights [10 5 4 3 3 2 2 2 2 1 1 1 1 1 1 1])
+;;(def release-weights [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1])
+;;(def release-weights [10 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0])
 
 (defonce spark-main-g (group "spark-main"))
 (defonce spark-early-g (group "spark early" :head spark-main-g))
@@ -72,7 +90,8 @@
   ;; (println "play-spark ****")
   (when (not play-again) (println "STOPPING !!!!!!!!!"))
   (let  [attack 0.001
-         release (+ 0.001 (rand 0.039))
+         max-release (* 0.0025 (inc (weighted-choice release-weights)))
+         release (+ 0.001 (rand max-release))
          action (if play-again NO-ACTION FREE)
          release-time (+ (now) (int (* (+ attack release) 1000)) 100)
          continue-playing (if (< (rand) 0.9) true false)
