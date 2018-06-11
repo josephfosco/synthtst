@@ -67,10 +67,10 @@
               (limiter
                (rhpf
                 (white-noise)
-                (latch:ar (+ (/ (* (- cutoff-max cutoff-min)
+                (latch:kr (+ (/ (* (- cutoff-max cutoff-min)
                                    (- (lf-noise1:kr 20) -1))
-                                (- 1 -1)) cutoff-min)
-                          (lf-noise1:kr 150))
+                                2) cutoff-min)
+                          (lf-noise1:kr 50))
                 (/ (+ 1 (lf-noise1:kr 12)) 2) ;; scale between 0 an 1
                 )
                1.0
@@ -86,17 +86,16 @@
 (ctl spk :gate 1)
 
 (defn play-synth
-  [synth play-again]
-  ;; (println "play-spark ****")
-  (when (not play-again) (println "STOPPING !!!!!!!!!"))
-  (let  [attack 0.001
-         max-release (* 0.0025 (inc (weighted-choice release-weights)))
+  [synth rel-weights play-count times-to-play]
+  (let  [continue-playing (< play-count times-to-play)
+         attack 0.001
+         max-release (* 0.0025 (inc (weighted-choice rel-weights)))
          release (+ 0.001 (rand max-release))
-         action (if play-again NO-ACTION FREE)
+         action (if continue-playing NO-ACTION FREE)
          release-time (+ (now) (int (* (+ attack release) 1000)) 100)
-         continue-playing (if (< (rand) 0.9) true false)
          next-time (+ release-time 250 (rand-int 800))
          ]
+    (when (not continue-playing) (println "STOPPING !!!!!!!!!"))
     (ctl synth
          :gate 1
          :attack attack
@@ -107,27 +106,42 @@
               #'ctl synth [:gate 0]
               )
 
-    (when play-again
-      (apply-at next-time
-                #'play-synth
-                synth
-                continue-playing []
-                )
-      )
+    (when continue-playing
+      (let [rel-weights-ndx (rand-int (count rel-weights))
+            inc-amt (inc (rand-int 6))
+            new-rel-weights (assoc rel-weights
+                                   rel-weights-ndx
+                                   (+ (rel-weights rel-weights-ndx)
+                                      inc-amt
+                                      )
+                                   )]
+;;        (println new-rel-weights)
+        (apply-at next-time
+                  #'play-synth
+                  synth
+                  new-rel-weights
+                  (inc play-count)
+                  times-to-play
+                  []
+                  )))
     )
   )
 
 (defn many-synths
-  [num-synths synth]
+  [num-synths synth times-to-play]
   (let [all-synths (for [s (range num-synths)]
                      (synth [:tail spark-early-g] :gate 0 :action NO-ACTION))
         ]
     (for [s all-synths] (apply-at (+ (now) (+ 500 (rand 2000)))
                                   #'play-synth
-                                  s true []
+                                  s
+                                  release-weights
+                                  0
+                                  30
+                                  []
                                   ))
     )
  )
 
-(many-synths 30 spark3-sound)
+(many-synths 30 spark3-sound 30)2
 (stop)
