@@ -34,6 +34,8 @@
         (recur (inc i) (+ (weight-vector i) sum)))))
   )
 
+(def max-release-weights [0.0025 0.005 0.01 0.05 0.1 0.5 1 2 3])
+
 (def release-weights [10 5 4 3 3 2 2 2 2 1 1 1 1 1 1 1])
 ;;(def release-weights [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1])
 ;;(def release-weights [10 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0])
@@ -89,13 +91,19 @@
   [synth rel-weights play-count times-to-play]
   (let  [continue-playing (< play-count times-to-play)
          attack 0.001
-         max-release (* 0.0025 (inc (weighted-choice rel-weights)))
+         array-step (/ times-to-play (dec (count max-release-weights)))
+         max-release-min-base-ndx (int (/ play-count array-step))
+         max-release-min-ndx (- max-release-min-base-ndx
+                                (rand-int (inc max-release-min-base-ndx)))
+         max-release (* (max-release-weights max-release-min-ndx)
+                        (inc (weighted-choice rel-weights)))
          release (+ 0.001 (rand max-release))
          action (if continue-playing NO-ACTION FREE)
          release-time (+ (now) (int (* (+ attack release) 1000)) 100)
          next-time (+ release-time 250 (rand-int 800))
          ]
     (when (not continue-playing) (println "STOPPING !!!!!!!!!"))
+;;    (println continue-playing play-count times-to-play)
     (ctl synth
          :gate 1
          :attack attack
@@ -108,14 +116,14 @@
 
     (when continue-playing
       (let [rel-weights-ndx (rand-int (count rel-weights))
-            inc-amt (inc (rand-int 6))
+            inc-amt (inc (rand-int 3))
             new-rel-weights (assoc rel-weights
                                    rel-weights-ndx
                                    (+ (rel-weights rel-weights-ndx)
                                       inc-amt
                                       )
                                    )]
-;;        (println new-rel-weights)
+        (println new-rel-weights)
         (apply-at next-time
                   #'play-synth
                   synth
@@ -137,11 +145,11 @@
                                   s
                                   release-weights
                                   0
-                                  30
+                                  times-to-play
                                   []
                                   ))
     )
  )
 
-(many-synths 30 spark3-sound 30)2
+(many-synths 30 spark3-sound 50)
 (stop)
