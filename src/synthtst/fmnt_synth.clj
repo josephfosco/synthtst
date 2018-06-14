@@ -1,4 +1,4 @@
-;    Copyright (C) 2016  Joseph Fosco. All Rights Reserved
+;    Copyright (C) 2016, 2018  Joseph Fosco. All Rights Reserved
 ;
 ;    This program is free software: you can redistribute it and/or modify
 ;    it under the terms of the GNU General Public License as published by
@@ -28,7 +28,9 @@
         env-generator (env-gen (env-adsr attack decay sustain release) env-gate 1 0 1)
         ]
     (* env-generator
-       (formant freq (+ cfreq (* (- env-generator 0.5) 1000)) (+ bw (* env-generator 500)))
+       (formant freq
+                (+ cfreq (* (- env-generator 0.5) 1000))
+                (+ bw (* env-generator 500)))
        vol
        )
     )
@@ -75,6 +77,10 @@
 
 ;;; using a bus for base pitch
 
+(defonce fmnt-main-g (group "fmnt-main"))
+(defonce fmnt-early-g (group "fmnt early" :head fmnt-main-g))
+(defonce fmnt-later-g (group "fmnt later" :after fmnt-early-g))
+
 (defonce pitch-bus (control-bus))
 
 (defsynth pitch-osc
@@ -90,14 +96,18 @@
                 attack 0.01 release 0.05
                 vol 1]
 
-  (let [env-impulse (impulse (range-lin (lf-noise0:kr 0.5) 3.0 5.0))
+  (let [env-impulse (impulse (range-lin (lf-noise0:kr 0.5)
+                                        (+ release 3.0)
+                                        (+ release 5.0)))
         env-ff (toggle-ff env-impulse)
         env-gate (gate env-ff env-impulse)
         envelope-generator (env-gen (perc attack release) env-gate 1 0 1)
         pitch (+ (in:kr freq-bus) (range-lin (lf-noise0:kr 1) -50 50))
         ]
     (* (formant pitch
-                (+ pitch (range-lin (lf-noise1:kr freq-cfreq) min-cfreq max-cfreq))
+                (+ pitch (range-lin (lf-noise1:kr freq-cfreq)
+                                    min-cfreq
+                                    max-cfreq))
                 (range-lin (lf-noise1:kr freq-bw) min-bw max-bw))
        envelope-generator
        vol
@@ -106,7 +116,56 @@
   )
 
 (def f4 (fmnt4))
+(ctl f4 :release 2.0)
 (stop)
+
+(defonce impulse-bus (control-bus))
+
+(defsynth pulses
+  [out-bus 2 release 0.05]
+  (out:kr out-bus
+          (impulse 1
+                   ;; (range-lin (lf-noise0:kr 0.5)
+                   ;;            (+ release 3.0)
+                   ;;            (+ release 5.0))
+                   )
+          )
+  )
+
+(def impulse-cntl (pulses [:tail fmnt-early-g]
+                          :out-bus impulse-bus
+                          :release 0.05))
+
+(defsynth fmnt4a [freq-bus 0 cfreq 880 bw 200.0
+                 min-cfreq -75 max-cfreq 75 freq-cfreq 100
+                 min-bw 10 max-bw 500 freq-bw 50
+                 attack 0.01 release 2.0
+                 vol 1]
+
+  (out [0 1]
+       (let [;;env-impulse trigger-pulses
+             env-ff (toggle-ff (in:kr impulse-bus))
+             env-gate (gate env-ff (in:kr impulse-bus))
+             envelope-generator (env-gen (perc attack release)
+                                         env-gate 1 0 NO-ACTION)
+             ;;pitch (+ (in:kr freq-bus) (range-lin (lf-noise0:kr 1) -50 50))
+             pitch 440
+             ]
+         (* (formant pitch
+                     (+ pitch (range-lin (lf-noise1:kr freq-cfreq)
+                                         min-cfreq
+                                         max-cfreq))
+                     (range-lin (lf-noise1:kr freq-bw) min-bw max-bw))
+            envelope-generator
+            vol
+            )
+         ))
+  )
+
+(def f4a (fmnt4a [:tail fmnt-later-g]))
+(ctl f4a :release 2.0)
+(stop)
+(out:kr impulse-bus 0)
 
 (definst fmnt5 [freq-bus 0 cfreq 880 bw 200.0
                 min-cfreq -75 max-cfreq 75 freq-cfreq 100
