@@ -136,18 +136,18 @@
                           :out-bus impulse-bus
                           :release 0.05))
 
-(defsynth fmnt4a [freq-bus 0 cfreq 880 bw 200.0
+(defsynth fmnt4a [freq-bus 0 cfreq 880
                  min-cfreq -75 max-cfreq 75 freq-cfreq 100
                  min-bw 10 max-bw 500 freq-bw 50
-                 attack 0.01 release 2.0
+                 attack 0.01 release 0.05
                  vol 1]
 
   (out [0 1]
        (let [;;env-impulse trigger-pulses
              env-ff (toggle-ff (in:kr impulse-bus))
-             env-gate (gate env-ff (in:kr impulse-bus))
+             env-gate (gate env-ff (delay1:kr (in:kr impulse-bus)))
              envelope-generator (env-gen (perc attack release)
-                                         env-gate 1 0 NO-ACTION)
+                                         env-gate 1 0 1 NO-ACTION)
              ;;pitch (+ (in:kr freq-bus) (range-lin (lf-noise0:kr 1) -50 50))
              pitch 440
              ]
@@ -157,7 +157,7 @@
                                          max-cfreq))
                      (range-lin (lf-noise1:kr freq-bw) min-bw max-bw))
             envelope-generator
-            vol
+            (* 0.75 vol)
             )
          ))
   )
@@ -165,7 +165,6 @@
 (def f4a (fmnt4a [:tail fmnt-later-g]))
 (ctl f4a :release 2.0)
 (stop)
-(out:kr impulse-bus 0)
 
 (definst fmnt5 [freq-bus 0 cfreq 880 bw 200.0
                 min-cfreq -75 max-cfreq 75 freq-cfreq 100
