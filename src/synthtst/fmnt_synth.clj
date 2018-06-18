@@ -84,13 +84,17 @@
 (defonce pitch-bus (control-bus))
 
 (defsynth pitch-osc
-  [out-bus 0 1freq 0.25 min-pitch 100 max-pitch 2000]
+  [out-bus 0 freq 0.25 min-pitch 100 max-pitch 2000]
   (out:kr out-bus (lin-exp (lf-noise1:kr freq) -1 1 min-pitch max-pitch ))
   )
 
 (def pitch-cntl (pitch-osc :out-bus pitch-bus :freq 2.0))
 (ctl pitch-cntl :max-pitch 1000)
 
+;; This synth does not work ho I thought it would,
+;; but it makes some interesting sounds (esp when used
+;; with the release=2.0)
+;; for future investigation
 (definst fmnt4 [freq-bus 0 cfreq 880 bw 200.0
                 min-cfreq -75 max-cfreq 75 freq-cfreq 100
                 min-bw 10 max-bw 500 freq-bw 50
@@ -129,8 +133,8 @@
   [out-bus 2 attack base-attack release base-release]
   (out:kr out-bus
           (impulse (range-lin (lf-noise0:kr 0.5)
-                              (/ 1 (+ 0.25 attack release))
-                              (/ 1 (+ 1.5 attack release))
+                              (/ 1 (/ (+ 0.5 attack release) 2))
+                              (/ 1 (/ (+ 3 attack release) 2))
                               )
                    )
           )
@@ -153,7 +157,7 @@
                                          env-gate 1 0 1 NO-ACTION)
              pitch (latch (+ (in:kr freq-bus)
                              (range-lin (lf-noise0:kr 1) -50 50))
-                          (in:kr impulse-bus)
+                          env-gate
                           )
              ]
          (* (formant pitch
@@ -174,7 +178,7 @@
     (ctl impulse-cntl :release release)
     ))
 (do
-  (let [attack 1.00]
+  (let [attack 5.00]
     (ctl f4a :attack attack)
     (ctl impulse-cntl :attack attack)
     ))
