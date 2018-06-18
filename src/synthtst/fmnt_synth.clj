@@ -122,12 +122,15 @@
 
 (defonce impulse-bus (control-bus))
 
+(def base-attack 0.01)
+(def base-release 0.05)
+
 (defsynth pulses
-  [out-bus 2 release 0.05]
+  [out-bus 2 attack base-attack release base-release]
   (out:kr out-bus
           (impulse (range-lin (lf-noise0:kr 0.5)
-                              (/ 1 (+ 0.5 release))
-                              (/ 1 (+ 0.33 release))
+                              (/ 1 (+ 0.25 attack release))
+                              (/ 1 (+ 1.5 attack release))
                               )
                    )
           )
@@ -140,16 +143,18 @@
 (defsynth fmnt4a [freq-bus 0 cfreq 880
                  min-cfreq -75 max-cfreq 75 freq-cfreq 100
                  min-bw 10 max-bw 500 freq-bw 50
-                 attack 0.01 release 0.05
+                 attack base-attack release base-release
                  vol 1]
 
   (out [0 1]
-       (let [;;env-impulse trigger-pulses
-             env-ff (toggle-ff (in:kr impulse-bus))
+       (let [env-ff (toggle-ff (in:kr impulse-bus))
              env-gate (gate env-ff (delay1:kr (in:kr impulse-bus)))
              envelope-generator (env-gen (perc attack release)
                                          env-gate 1 0 1 NO-ACTION)
-             pitch (+ (in:kr freq-bus) (range-lin (lf-noise0:kr 1) -50 50))
+             pitch (latch (+ (in:kr freq-bus)
+                             (range-lin (lf-noise0:kr 1) -50 50))
+                          (in:kr impulse-bus)
+                          )
              ]
          (* (formant pitch
                      (+ pitch (range-lin (lf-noise1:kr freq-cfreq)
@@ -164,9 +169,14 @@
 
 (def f4a (fmnt4a [:tail fmnt-later-g] :freq-bus pitch-bus))
 (do
-  (let [release 2.0]
+  (let [release 2.00]
     (ctl f4a :release release)
     (ctl impulse-cntl :release release)
+    ))
+(do
+  (let [attack 1.00]
+    (ctl f4a :attack attack)
+    (ctl impulse-cntl :attack attack)
     ))
 (stop)
 
