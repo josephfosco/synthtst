@@ -84,11 +84,12 @@
 (defonce pitch-bus (control-bus))
 
 (defsynth pitch-osc
-  [out-bus 0 freq 0.25 min-pitch 100 max-pitch 2000]
+  [out-bus 0 1freq 0.25 min-pitch 100 max-pitch 2000]
   (out:kr out-bus (lin-exp (lf-noise1:kr freq) -1 1 min-pitch max-pitch ))
   )
 
 (def pitch-cntl (pitch-osc :out-bus pitch-bus :freq 2.0))
+(ctl pitch-cntl :max-pitch 1000)
 
 (definst fmnt4 [freq-bus 0 cfreq 880 bw 200.0
                 min-cfreq -75 max-cfreq 75 freq-cfreq 100
@@ -124,10 +125,10 @@
 (defsynth pulses
   [out-bus 2 release 0.05]
   (out:kr out-bus
-          (impulse 1
-                   ;; (range-lin (lf-noise0:kr 0.5)
-                   ;;            (+ release 3.0)
-                   ;;            (+ release 5.0))
+          (impulse (range-lin (lf-noise0:kr 0.5)
+                              (/ 1 (+ 0.5 release))
+                              (/ 1 (+ 0.33 release))
+                              )
                    )
           )
   )
@@ -148,8 +149,7 @@
              env-gate (gate env-ff (delay1:kr (in:kr impulse-bus)))
              envelope-generator (env-gen (perc attack release)
                                          env-gate 1 0 1 NO-ACTION)
-             ;;pitch (+ (in:kr freq-bus) (range-lin (lf-noise0:kr 1) -50 50))
-             pitch 440
+             pitch (+ (in:kr freq-bus) (range-lin (lf-noise0:kr 1) -50 50))
              ]
          (* (formant pitch
                      (+ pitch (range-lin (lf-noise1:kr freq-cfreq)
@@ -157,13 +157,17 @@
                                          max-cfreq))
                      (range-lin (lf-noise1:kr freq-bw) min-bw max-bw))
             envelope-generator
-            (* 0.75 vol)
+            (* 0.2 vol)
             )
          ))
   )
 
-(def f4a (fmnt4a [:tail fmnt-later-g]))
-(ctl f4a :release 2.0)
+(def f4a (fmnt4a [:tail fmnt-later-g] :freq-bus pitch-bus))
+(do
+  (let [release 2.0]
+    (ctl f4a :release release)
+    (ctl impulse-cntl :release release)
+    ))
 (stop)
 
 (definst fmnt5 [freq-bus 0 cfreq 880 bw 200.0
