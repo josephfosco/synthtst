@@ -91,7 +91,7 @@
 (def pitch-cntl (pitch-osc :out-bus pitch-bus :freq 2.0))
 (ctl pitch-cntl :max-pitch 1000)
 
-;; This synth does not work ho I thought it would,
+;; This synth does not work though I thought it would,
 ;; but it makes some interesting sounds (esp when used
 ;; with the release=2.0)
 ;; for future investigation
