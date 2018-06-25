@@ -40,6 +40,8 @@
 ;;(def release-weights [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1])
 ;;(def release-weights [10 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0])
 
+(def attack-weights [15 5 2 1 1 1 1 1 1 1])
+
 (defonce spark-main-g (group "spark-main"))
 (defonce spark-early-g (group "spark early" :head spark-main-g))
 (defonce spark-later-g (group "spark later" :after spark-early-g))
@@ -153,10 +155,9 @@
 
 (def spark3-synth-inst (spark3-synth [:tail spark-later-g]))
 
-
 (def pitch-cntl (pitch-osc [:tail fmnt-early-g] :out-bus pitch-bus :freq 2.0))
-(ctl pitch-cntl :max-pitch 60)
-(ctl pitch-cntl :min-pitch 60)
+(ctl pitch-cntl :max-pitch 400)
+(ctl pitch-cntl :min-pitch 100)
 
 ;; (def impulse-cntl (pulses [:tail fmnt-early-g]
 ;;                           :out-bus impulse-bus
@@ -168,9 +169,24 @@
 (stop)
 
 (defn play-synth
-  [synth rel-weights play-count times-to-play attack]
+  [synth rel-weights play-count times-to-play atck]
   (let  [continue-playing (< play-count times-to-play)
-         ;; attack (rand 0.01)
+         ratio-done (/ play-count times-to-play)
+         attack (if atck
+                  atck
+                  (* (rand) (/ (inc (weighted-choice attack-weights))
+                                 (cond
+                                   (< ratio-done 0.2) 10000
+                                   (< ratio-done 0.4) 1000
+                                   (< ratio-done 0.6) 100
+                                   (< ratio-done 0.8) 10
+                                   (<= ratio-done 1) 2
+                                   )
+                                 ;; 0.001
+                                 ;; (if (< (/ play-count times-to-play) 0.5)
+                                 ;;   (max 1000 0.001)
+                                 ;;   (if (> (rand) 0.5) 2 10))
+                                 )))
          array-step (/ times-to-play (dec (count max-release-weights)))
          max-release-min-base-ndx (int (/ play-count array-step))
          max-release-min-ndx (- max-release-min-base-ndx
@@ -180,10 +196,11 @@
          release (+ 0.001 (rand max-release))
          action (if continue-playing NO-ACTION FREE)
          release-time (+ (now) (int (* (+ attack release) 1000)) 100)
-         next-time (+ release-time 250 (rand-int 800))
+         next-time (+ release-time 250 (rand-int 2000))
          ]
     (when (not continue-playing) (println "STOPPING !!!!!!!!!"))
-;;    (println continue-playing play-count times-to-play)
+    ;; (println continue-playing play-count times-to-play)
+
     (ctl synth
          :gate 1
          :attack attack
@@ -193,7 +210,7 @@
     (apply-at release-time
               #'ctl synth [:gate 0]
               )
-
+    (println attack release)
     (when continue-playing
       (let [rel-weights-ndx (rand-int (count rel-weights))
             inc-amt (inc (rand-int 3))
@@ -203,14 +220,14 @@
                                       inc-amt
                                       )
                                    )]
-        (println new-rel-weights)
+        ;; (println new-rel-weights)
         (apply-at next-time
                   #'play-synth
                   [synth
                    new-rel-weights
                    (inc play-count)
                    times-to-play
-                   attack]
+                   atck]
                   )))
     )
   )
@@ -226,8 +243,7 @@
                              [:tail group])
                        (conj base-synth-params [:tail group])
                        )
-        attack (or (:attack (apply hash-map extra-synth-params))
-                   (rand 0.01))
+        attack (:attack (apply hash-map extra-synth-params))
         all-synths (for [s (range num-synths)]
                      (apply synth synth-params))
         ]
@@ -244,8 +260,8 @@
     )
  )
 
-(many-synths 15 spark3-sound 50 spark-early-g)
-(many-synths 15 fmnt4a 20 fmnt-later-g :freq-bus pitch-bus :vol 0.2 :attack 2.0)
+(many-synths 25 spark3-sound 25 spark-early-g)
+(many-synths 25 fmnt4a 25 fmnt-later-g :freq-bus pitch-bus :vol 0.2)
 (stop)
 
 (def fs (fmnt4a [:tail fmnt-later-g]
