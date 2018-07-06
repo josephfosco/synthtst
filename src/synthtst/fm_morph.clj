@@ -23,26 +23,23 @@
 (defonce fm-early-g (group "fm early" :head fm-main-g))
 (defonce fm-later-g (group "fm later" :after fm-early-g))
 
-(defonce fm-audio-bus (audio-bus 1 "fm-audio-bus"))
+(defonce main-audio-bus (audio-bus 1 "fm-audio-bus"))
 (defonce fm-ctl-bus (control-bus 1 "fm-ctl-bus"))
 
-(defsynth fm-bus-synth
+(defsynth main-out-synth
   []
   (out [0 1]
-       (limiter (in fm-audio-bus) 0.9 0.01)
+       (limiter (in main-audio-bus) 0.9 0.01)
        )
   )
 
-(def fm-main-out (fm-bus-synth))
+(def fm-main-out (main-out-synth [:tail fm-later-g]))
 
-;; (defsynth pitch-osc
-;;   [out-bus 0 freq 0.25 min-pitch 100 max-pitch 2000]
-;;   (out:kr out-bus (lin-exp (lf-noise1:kr freq) -1 1 min-pitch max-pitch ))
-;;   )
+;;-----------------------------------------------------------------
 
-(defsynth fm-oper
-  [freq 440 vol 1]
-  (out fm-audio-bus
+(defsynth fm-out-bus
+  [freq 880 vol 1]
+  (out main-audio-bus
        (* (sin-osc :freq freq)
           vol
           )
@@ -50,37 +47,98 @@
   )
 
 
-(def fm-oper-inst (fm-oper [:tail fm-later-g] :freq 110))
+(def fm-mod-out-inst (fm-out-bus [:tail fm-early-g] :freq 110))
 (stop)
 
-(def base-freq 110)
-(def num-oper 8)
 (dotimes [i num-oper]
-  (fm-oper [:tail fm-later-g] :freq (* base-freq i) :vol (* (/ 1 num-oper)
+  (fm-out-bus [:tail fm-later-g] :freq (* base-freq i) :vol (* (/ 1 num-oper)
                                                             (/ 1 (inc i))))
   )
 
 (defsynth fm-synth
-  [freq1 440 freq2 440 fm-amt 10 vol 1]
-  (out fm-audio-bus
-       (*
-        (sin-osc :freq (+ freq1
-                          (* (sin-osc :freq freq2) fm-amt)))
-        vol
-        )
-       )
+  [freq1 440 freq2 440 fm-amt 50 vol 1]
+  (let [envelope (env-gen (perc 3.0 3.0 1) 1 1 0 1 FREE)]
+      (out fm-audio-bus
+           (*
+            (sin-osc :freq (+ freq1
+                              (* (sin-osc :freq freq2) fm-amt envelope)))
+            (* envelope vol)
+            )
+           ))
   )
 
 
-(def fm-synth-inst (fm-synth [:tail fm-later-g] :freq1 110 :freq2 1))
+(def fm-synth-inst (fm-synth [:tail fm-later-g] :freq1 110 :freq2 1760))
 (stop)
 (ctl fm-synth-inst :freq2 30)
 (ctl fm-synth-inst :freq1 220)
 (ctl fm-synth-inst :fm-amt 100)
 
+;;-----------------------------------------------------------------
+
+(def fm-main-out (main-out-synth [:tail fm-later-g]))
+
+(defonce fm-mod-bus1 (audio-bus 1 "fm-mod-bus1"))
+(defonce fm-mod-bus2 (audio-bus 1 "fm-mod-bus2"))
+
+(def gl-base-freq 110)
+(def num-oper 2)
+
+(defsynth fm-mod1
+  []
+  (out fm-mod-bus1 (* (sin-osc :freq 0.5) 1000))
+  )
+
+(def mod1 (fm-mod1 [:head fm-early-g]))
+
+(defsynth fm-oper
+  [
+   base-freq 110
+   freq-ratio 1
+   in-mod-bus 3
+   out-mod-bus 1
+   out-mod-bus-lvl 0.5
+   fm-amt 50
+   vol 1
+   action NO-ACTION
+   gate 0
+   ]
+  (let [envelope (env-gen (perc 3.0 3.0) gate 1 0 1 action)
+        out-osc (* (sin-osc :freq (+ (* base-freq freq-ratio)
+                                     (in:ar in-mod-bus)))
+                   (* envelope 1)
+                   )
+        ]
+    (out out-mod-bus (* out-osc out-mod-bus-lvl))
+    (out main-audio-bus (* out-osc vol))
+    ))
 
 
+(def oper1 (fm-oper [:tail fm-early-g]
+                    :freq-ratio 1
+                    :in-mod-bus fm-mod-bus2
+                    :out-mod-bus fm-mod-bus1
+                    :out-mod-bus-lvl 1
+                    ))
+(def oper2 (fm-oper [:tail fm-early-g]
+                    :freq-ratio 1.42
+                    :in-mod-bus fm-mod-bus1
+                    :out-mod-bus fm-mod-bus2
+                    :out-mod-bus-lvl 500
+                    :vol 0
+                    ))
+(do
+  (ctl oper1 :gate 1 :action FREE)
+  (ctl oper2 :gate 1 :action FREE)
+  )
 
+(ctl oper1 :gate 1 :action FREE)
+
+(stop)
+
+(def testo (sin-osc))
+
+;;---------------------------------------------------------
 
 
 (def pitch-cntl (pitch-osc [:tail fmnt-early-g] :out-bus pitch-bus :freq 2.0))
