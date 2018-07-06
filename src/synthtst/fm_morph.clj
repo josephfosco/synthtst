@@ -33,7 +33,7 @@
        )
   )
 
-(def fm-main-out (main-out-synth [:tail fm-later-g]))
+;; (def fm-main-out (main-out-synth [:tail fm-later-g]))
 
 ;;-----------------------------------------------------------------
 
@@ -79,7 +79,10 @@
 (def fm-main-out (main-out-synth [:tail fm-later-g]))
 
 (defonce fm-mod-bus1 (audio-bus 1 "fm-mod-bus1"))
+(defonce feedback-bus1 (audio-bus 1 "feedback-bus1"))
 (defonce fm-mod-bus2 (audio-bus 1 "fm-mod-bus2"))
+(defonce feedback-bus2 (audio-bus 1 "feedback-bus2"))
+
 
 (def gl-base-freq 110)
 (def num-oper 2)
@@ -90,6 +93,21 @@
   )
 
 (def mod1 (fm-mod1 [:head fm-early-g]))
+
+(defsynth feedback-synth
+  [inbus 3 outbus 3]
+  (let [input (in-feedback:ar inbus)]
+    (out:ar outbus input)
+    ))
+
+(def feedback1 (feedback-synth [:head fm-early-g]
+                               :inbus fm-mod-bus1
+                               :outbus feedback-bus1))
+(def feedback2 (feedback-synth [:head fm-early-g]
+                               :inbus fm-mod-bus2
+                               :outbus feedback-bus2)
+  )
+(stop)
 
 (defsynth fm-oper
   [
@@ -116,13 +134,13 @@
 
 (def oper1 (fm-oper [:tail fm-early-g]
                     :freq-ratio 1
-                    :in-mod-bus fm-mod-bus2
+                    :in-mod-bus feedback-bus2
                     :out-mod-bus fm-mod-bus1
                     :out-mod-bus-lvl 1
                     ))
 (def oper2 (fm-oper [:tail fm-early-g]
                     :freq-ratio 1.42
-                    :in-mod-bus fm-mod-bus1
+                    :in-mod-bus feedback-bus1
                     :out-mod-bus fm-mod-bus2
                     :out-mod-bus-lvl 500
                     :vol 0
