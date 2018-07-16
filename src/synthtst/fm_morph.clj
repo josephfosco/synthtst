@@ -24,7 +24,6 @@
 (defonce fm-later-g (group "fm later" :after fm-early-g))
 
 (defonce main-audio-bus (audio-bus 1 "fm-audio-bus"))
-(defonce fm-ctl-bus (control-bus 1 "fm-ctl-bus"))
 
 (defsynth main-out-synth
   []
@@ -78,45 +77,35 @@
 
 (def fm-main-out (main-out-synth [:tail fm-later-g]))
 
+(def gl-base-freq 110)
+
 (defonce fm-mod-bus1 (audio-bus 1 "fm-mod-bus1"))
 (defonce feedback-bus1 (audio-bus 1 "feedback-bus1"))
 (defonce fm-mod-bus2 (audio-bus 1 "fm-mod-bus2"))
 (defonce feedback-bus2 (audio-bus 1 "feedback-bus2"))
 
-
-(def gl-base-freq 110)
-(def num-oper 2)
-
-(defsynth fm-mod1
-  []
-  (out fm-mod-bus1 (* (sin-osc :freq 0.5) 1000))
-  )
-
-(def mod1 (fm-mod1 [:head fm-early-g]))
-
-(defsynth feedback-synth
+(defsynth feedback-synth1
   [inbus 3 outbus 3]
   (let [input (in-feedback:ar inbus)]
     (out:ar outbus input)
     ))
 
-(def feedback1 (feedback-synth [:head fm-early-g]
-                               :inbus fm-mod-bus1
-                               :outbus feedback-bus1))
-(def feedback2 (feedback-synth [:head fm-early-g]
-                               :inbus fm-mod-bus2
-                               :outbus feedback-bus2)
+(def feedback1 (feedback-synth1 [:head fm-early-g]
+                                :inbus fm-mod-bus1
+                                :outbus feedback-bus1))
+(def feedback2 (feedback-synth1 [:head fm-early-g]
+                                :inbus fm-mod-bus2
+                                :outbus feedback-bus2)
   )
 (stop)
 
-(defsynth fm-oper
+(defsynth fm-oper1
   [
    base-freq 110
    freq-ratio 1
    in-mod-bus 3
    out-mod-bus 1
    out-mod-bus-lvl 0.5
-   fm-amt 50
    vol 1
    action NO-ACTION
    gate 0
@@ -132,22 +121,25 @@
     ))
 
 
-(def oper1 (fm-oper [:tail fm-early-g]
-                    :freq-ratio 1
-                    :in-mod-bus feedback-bus2
-                    :out-mod-bus fm-mod-bus1
-                    :out-mod-bus-lvl 1
-                    ))
-(def oper2 (fm-oper [:tail fm-early-g]
-                    :freq-ratio 1.42
-                    :in-mod-bus feedback-bus1
-                    :out-mod-bus fm-mod-bus2
-                    :out-mod-bus-lvl 500
-                    :vol 0
-                    ))
+(def oper1a (fm-oper1 [:tail fm-early-g]
+                     :base-freq gl-base-freq
+                     :freq-ratio 1
+                     :in-mod-bus feedback-bus2
+                     :out-mod-bus fm-mod-bus1
+                     :out-mod-bus-lvl 1
+                     :vol 1
+                     ))
+(def oper2a (fm-oper1 [:tail fm-early-g]
+                     :base-freq gl-base-freq
+                     :freq-ratio 2.0
+                     :in-mod-bus feedback-bus1
+                     :out-mod-bus fm-mod-bus2
+                     :out-mod-bus-lvl 500
+                     :vol 0
+                     ))
 (do
-  (ctl oper1 :gate 1 :action FREE)
-  (ctl oper2 :gate 1 :action FREE)
+  (ctl oper1a :gate 1 :action FREE)
+  (ctl oper2a :gate 1 :action FREE)
   )
 
 (ctl oper1 :gate 1 :action FREE)
@@ -157,139 +149,161 @@
 (def testo (sin-osc))
 
 ;;---------------------------------------------------------
+(defonce fm-main-g (group "fm-main"))
+(defonce fm-early-g (group "fm early" :head fm-main-g))
+(defonce fm-later-g (group "fm later" :after fm-early-g))
 
+(defonce main-audio-bus (audio-bus 1 "fm-audio-bus"))
 
-(def pitch-cntl (pitch-osc [:tail fmnt-early-g] :out-bus pitch-bus :freq 2.0))
-(ctl pitch-cntl :max-pitch 400)
-(ctl pitch-cntl :min-pitch 100)
-
-
-(def spk (spark3-sound [:tail spark-early-g] :release 0.1 :gate 1 :action FREE))
-(ctl spk :gate 0)
-(ctl spk :gate 1)
-(stop)
-
-(defn play-synth
-  [synth rel-weights play-count times-to-play atck]
-  (let  [continue-playing (< play-count times-to-play)
-         ratio-done (/ play-count times-to-play)
-         attack (if atck
-                  atck
-                  (* (rand) (/ (inc (weighted-choice attack-weights))
-                                 (cond
-                                   (< ratio-done 0.2) 10000
-                                   (< ratio-done 0.4) 1000
-                                   (< ratio-done 0.6) 100
-                                   (< ratio-done 0.8) 10
-                                   (<= ratio-done 1) 2
-                                   )
-                                 ;; 0.001
-                                 ;; (if (< (/ play-count times-to-play) 0.5)
-                                 ;;   (max 1000 0.001)
-                                 ;;   (if (> (rand) 0.5) 2 10))
-                                 )))
-         array-step (/ times-to-play (dec (count max-release-weights)))
-         max-release-min-base-ndx (int (/ play-count array-step))
-         max-release-min-ndx (- max-release-min-base-ndx
-                                (rand-int (inc max-release-min-base-ndx)))
-         max-release (* (max-release-weights max-release-min-ndx)
-                        (inc (weighted-choice rel-weights)))
-         release (+ 0.001 (rand max-release))
-         action (if continue-playing NO-ACTION FREE)
-         release-time (+ (now) (int (* (+ attack release) 1000)) 100)
-         next-time (+ release-time 250 (rand-int 2000))
-         ]
-    (when (not continue-playing) (println "STOPPING !!!!!!!!!"))
-    ;; (println continue-playing play-count times-to-play)
-
-    (ctl synth
-         :gate 1
-         :attack attack
-         :release release
-         :action action
-         )
-    (apply-at release-time
-              #'ctl synth [:gate 0]
-              )
-    (println attack release)
-    (when continue-playing
-      (let [rel-weights-ndx (rand-int (count rel-weights))
-            inc-amt (inc (rand-int 3))
-            new-rel-weights (assoc rel-weights
-                                   rel-weights-ndx
-                                   (+ (rel-weights rel-weights-ndx)
-                                      inc-amt
-                                      )
-                                   )]
-        ;; (println new-rel-weights)
-        (apply-at next-time
-                  #'play-synth
-                  [synth
-                   new-rel-weights
-                   (inc play-count)
-                   times-to-play
-                   atck]
-                  )))
-    )
-  )
-
-(defn many-synths
-  [num-synths synth times-to-play group & extra-synth-params]
-  (let [base-synth-params (list
-                           :gate 0
-                           :action NO-ACTION)
-        synth-params (if extra-synth-params
-                       (conj (flatten (conj base-synth-params
-                                            extra-synth-params))
-                             [:tail group])
-                       (conj base-synth-params [:tail group])
-                       )
-        attack (:attack (apply hash-map extra-synth-params))
-        all-synths (for [s (range num-synths)]
-                     (apply synth synth-params))
-        ]
-    (println synth-params)
-    (for [synth all-synths] (apply-at (+ (now) (+ 500 (rand 2000)))
-                                      #'play-synth
-                                      [synth
-                                       release-weights
-                                       0
-                                       times-to-play
-                                       attack
-                                       ]
-                                  ))
-    )
- )
-
-(many-synths 25 spark3-sound 25 spark-early-g)
-(many-synths 25 fmnt4a 25 fmnt-later-g :freq-bus pitch-bus :vol 0.2)
-(stop)
-
-
-;;------------------------------------------------------------------
-
-;; BUS TEST - defining and reading multiple busses at once
-
-(defonce ctl-bus (control-bus "ctl-bus"))
-
-(defsynth ctl-syn
-  [freq 440 vol 0.2]
-  (out:kr ctl-bus [freq vol])
-  )
-
-(def c-syn (ctl-syn))
-(ctl c-syn :freq 220)
-(ctl c-syn :vol 0.2)
-
-(defsynth bus-tst
-  [cbus ctl-bus]
+(defsynth main-out-synth
+  []
   (out [0 1]
-       (let [[c-freq c-vol] (in:kr cbus 2)]
-         ;; (* (sin-osc :freq c-freq) c-vol)
-         (* (sin-osc :freq c-freq) c-vol)
-         )
+       (limiter (in main-audio-bus) 0.9 0.01)
        )
   )
 
-(def bt (bus-tst))
+(def fm-main-out (main-out-synth [:tail fm-later-g]))
+
+(def num-operators 2)
+(def num-cntl-buses 4)
+
+(defonce fm-mod-buses (vec (for [i (range num-operators)]
+                              (audio-bus 1 (str "fm-mod-bus" i)))))
+(defonce feedback-buses (vec (for [i (range num-operators)]
+                                (audio-bus 1 (str "feedback-bus" i)))))
+
+(defsynth feedback-synth
+  [inbus 3 outbus 3]
+  (let [input (in-feedback:ar inbus)]
+    (out:ar outbus input)
+    ))
+
+;; feedback-synths move audio data from the fm-mod-busses to the
+;; feedback-busses. This is done so that all operators can access the output
+;; of all other operators (on the feedback-busses). Without this, an
+;; individual operator would only be able to use the output of operators
+;; defined after it was. This works because feedback-synth uses the
+;; in-feedback ugen.
+(def feedback-synths (vec (for [i (range num-operators)]
+                        (feedback-synth [:head fm-early-g]
+                                        :inbus (fm-mod-buses i)
+                                        :outbus (feedback-buses i))
+                        )))
+
+;; Creates a vector of num-operators vectors with each internal vector
+;; having num-cntl-buses control-buses
+(def cntl-buses
+  (vec (for [opr (range num-operators)]
+         (vec (for [c-bus (range num-cntl-buses)]
+                (control-bus)))
+         ))
+  )
+
+(defsynth cntl-synth
+  [
+   out-bus 0
+   base-freq 440
+   freq-ratio 1
+   out-mod-lvl 0.5
+   volume 1
+   morph-time 1
+   ]
+  (let [bf (lag:kr base-freq morph-time)
+        fr (lag3:kr freq-ratio morph-time)
+        o-ml (lag3:kr out-mod-lvl morph-time)
+        vol (lag3:kr volume morph-time)
+        ]
+    (out:kr out-bus [bf fr o-ml vol])
+    )
+  )
+
+(def cntl-parms [
+                {:freq-ratio 1 :out-mod-lvl 1 :vol 1}
+                {:freq-ratio 1.42 :out-mod-lvl 500 :vol 0}
+                ])
+
+(def the-base-freq 110)
+
+(def cntl-synths
+  (vec (for [i (range num-operators)]
+         (let [parms (cntl-parms i)]
+           (cntl-synth [:head fm-early-g]
+                       ((cntl-buses i) 0)
+                       the-base-freq
+                       (:freq-ratio parms)
+                       (:out-mod-lvl parms)
+                       (:vol parms)
+                       ))
+         ))
+  )
+
+(defsynth fm-oper
+  [
+   the-base-freq-bus 1
+   freq-ratio-bus 6
+   in-mod-bus 3
+   out-mod-bus 2
+   out-mod-lvl-bus 7
+   vol 1
+   action NO-ACTION
+   gate 0
+   ]
+  (let [envelope (env-gen (perc 3.0 3.0) gate 1 0 1 action)
+        out-osc (* (sin-osc :freq (+ (* (in:kr the-base-freq-bus)
+                                        (in:kr freq-ratio-bus))
+                                     (in:ar in-mod-bus)))
+                   (* envelope 1)
+                   )
+        ]
+    (out out-mod-bus (* out-osc (in:kr out-mod-lvl-bus)))
+    (out main-audio-bus (* out-osc (in:kr vol)))
+    ))
+
+(def oper1 (fm-oper [:tail fm-early-g]
+                    :the-base-freq-bus ((cntl-buses 0) 0)
+                    :freq-ratio-bus ((cntl-buses 0) 1)
+                    :in-mod-bus (feedback-buses 1)
+                    :out-mod-bus (fm-mod-buses 0)
+                    :out-mod-lvl-bus ((cntl-buses 0) 2)
+                    :vol ((cntl-buses 0) 3)
+                    ))
+(def oper2 (fm-oper [:tail fm-early-g]
+                    :the-base-freq-bus ((cntl-buses 0) 0)
+                    :freq-ratio ((cntl-buses 1) 1)
+                    :in-mod-bus (feedback-buses 0)
+                    :out-mod-bus (fm-mod-buses 1)
+                    :out-mod-lvl-bus ((cntl-buses 1) 2)
+                    :vol ((cntl-buses 1) 3)
+                    ))
+
+(do
+  (ctl oper1 :gate 1 :action FREE)
+  (ctl oper2 :gate 1 :action FREE)
+  )
+(control-bus-set! base-freq-bus 110)
+(ctl (cntl-synths 1) :freq-ratio 2)
 (stop)
+
+(defsynth tsynth
+  []
+  (let [envelope (env-gen (perc 1.0 1.0) 1 1 0 1 FREE)]
+    (out main-audio-bus
+           (* (sin-osc :freq (in:kr base-freq-bus)) envelope)
+           ))
+  )
+
+(def synthtest (tsynth [:tail fm-early-g]))
+
+(defsynth tsynth2
+  []
+  (let [envelope (env-gen (perc 1.0 1.0) 1 1 0 1 FREE)
+        osc1 (* (sin-osc :freq 440) envelope)
+        osc2 (* (sin-osc :freq 110) envelope)
+        ]
+    (out 0 [osc1 osc2]
+         ))
+  )
+
+(def synthtest2 (tsynth2 [:tail fm-early-g]))
+
+;;---------------------------------------------------------
