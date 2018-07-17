@@ -165,7 +165,7 @@
 (def fm-main-out (main-out-synth [:tail fm-later-g]))
 
 (def num-operators 2)
-(def num-cntl-buses 4)
+(def num-cntl-buses 3)
 
 (defonce fm-mod-buses (vec (for [i (range num-operators)]
                               (audio-bus 1 (str "fm-mod-bus" i)))))
@@ -177,6 +177,9 @@
   (let [input (in-feedback:ar inbus)]
     (out:ar outbus input)
     ))
+
+(defonce base-freq-bus (control-bus 1 "base-freq-bus"))
+(control-bus-set! base-freq-bus 110)
 
 ;; feedback-synths move audio data from the fm-mod-busses to the
 ;; feedback-busses. This is done so that all operators can access the output
@@ -202,24 +205,22 @@
 (defsynth cntl-synth
   [
    out-bus 0
-   base-freq 440
    freq-ratio 1
    out-mod-lvl 0.5
    volume 1
    morph-time 1
    ]
-  (let [bf (lag:kr base-freq morph-time)
-        fr (lag3:kr freq-ratio morph-time)
+  (let [fr (lag3:kr freq-ratio morph-time)
         o-ml (lag3:kr out-mod-lvl morph-time)
         vol (lag3:kr volume morph-time)
         ]
-    (out:kr out-bus [bf fr o-ml vol])
+    (out:kr out-bus [fr o-ml vol])
     )
   )
 
 (def cntl-parms [
                 {:freq-ratio 1 :out-mod-lvl 1 :vol 1}
-                {:freq-ratio 1.42 :out-mod-lvl 500 :vol 0}
+                {:freq-ratio 2.0 :out-mod-lvl 500 :vol 0}
                 ])
 
 (def the-base-freq 110)
@@ -229,7 +230,6 @@
          (let [parms (cntl-parms i)]
            (cntl-synth [:head fm-early-g]
                        ((cntl-buses i) 0)
-                       the-base-freq
                        (:freq-ratio parms)
                        (:out-mod-lvl parms)
                        (:vol parms)
@@ -239,7 +239,7 @@
 
 (defsynth fm-oper
   [
-   the-base-freq-bus 1
+   b-freq-bus 1
    freq-ratio-bus 6
    in-mod-bus 3
    out-mod-bus 2
@@ -249,7 +249,7 @@
    gate 0
    ]
   (let [envelope (env-gen (perc 3.0 3.0) gate 1 0 1 action)
-        out-osc (* (sin-osc :freq (+ (* (in:kr the-base-freq-bus)
+        out-osc (* (sin-osc :freq (+ (* (in:kr b-freq-bus)
                                         (in:kr freq-ratio-bus))
                                      (in:ar in-mod-bus)))
                    (* envelope 1)
@@ -260,28 +260,29 @@
     ))
 
 (def oper1 (fm-oper [:tail fm-early-g]
-                    :the-base-freq-bus ((cntl-buses 0) 0)
-                    :freq-ratio-bus ((cntl-buses 0) 1)
+                    :b-freq-bus base-freq-bus
+                    :freq-ratio-bus ((cntl-buses 0) 0)
                     :in-mod-bus (feedback-buses 1)
                     :out-mod-bus (fm-mod-buses 0)
-                    :out-mod-lvl-bus ((cntl-buses 0) 2)
-                    :vol ((cntl-buses 0) 3)
+                    :out-mod-lvl-bus ((cntl-buses 0) 1)
+                    :vol ((cntl-buses 0) 2)
                     ))
 (def oper2 (fm-oper [:tail fm-early-g]
-                    :the-base-freq-bus ((cntl-buses 0) 0)
-                    :freq-ratio ((cntl-buses 1) 1)
+                    :b-freq-bus base-freq-bus
+                    :freq-ratio ((cntl-buses 1) 0)
                     :in-mod-bus (feedback-buses 0)
                     :out-mod-bus (fm-mod-buses 1)
-                    :out-mod-lvl-bus ((cntl-buses 1) 2)
-                    :vol ((cntl-buses 1) 3)
+                    :out-mod-lvl-bus ((cntl-buses 1) 1)
+                    :vol ((cntl-buses 1) 2)
                     ))
 
 (do
   (ctl oper1 :gate 1 :action FREE)
   (ctl oper2 :gate 1 :action FREE)
   )
-(control-bus-set! base-freq-bus 110)
-(ctl (cntl-synths 1) :freq-ratio 2)
+(ctl (cntl-synths 1) :freq-ratio 0.01)
+(control-bus-get ((cntl-buses 1) 1))
+(control-bus-set! base-freq-bus 220)
 (stop)
 
 (defsynth tsynth
