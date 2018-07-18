@@ -267,7 +267,7 @@
                     ))
 (def oper2 (fm-oper [:tail fm-early-g]
                     :b-freq-bus base-freq-bus
-                    :freq-ratio ((cntl-buses 1) 0)
+                    :freq-ratio-bus ((cntl-buses 1) 0)
                     :in-mod-bus (feedback-buses 0)
                     :out-mod-bus (fm-mod-buses 1)
                     :out-mod-lvl-bus ((cntl-buses 1) 1)
