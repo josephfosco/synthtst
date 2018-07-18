@@ -317,3 +317,167 @@
 (def synthtest2 (tsynth2 [:tail fm-early-g]))
 
 ;;---------------------------------------------------------
+
+(defonce fm-main-g (group "fm-main"))
+(defonce fm-early-g (group "fm early" :head fm-main-g))
+(defonce fm-later-g (group "fm later" :after fm-early-g))
+
+(defonce main-audio-bus (audio-bus 1 "fm-audio-bus"))
+
+(defsynth main-out-synth
+  []
+  (out [0 1]
+       (limiter (in main-audio-bus) 0.9 0.01)
+       )
+  )
+
+(def fm-main-out (main-out-synth [:tail fm-later-g]))
+
+(def num-operators 2)
+(def num-cntl-buses 3)
+
+(defonce fm-mod-buses (vec (for [i (range num-operators)]
+                              (audio-bus 1 (str "fm-mod-bus" i)))))
+(defonce feedback-buses (vec (for [i (range num-operators)]
+                                (audio-bus 1 (str "feedback-bus" i)))))
+
+(defsynth feedback-synth
+  [inbus 3 outbus 3]
+  (let [input (in-feedback:ar inbus)]
+    (out:ar outbus input)
+    ))
+
+;; feedback-synths move audio data from the fm-mod-busses to the
+;; feedback-busses. This is done so that all operators can access the output
+;; of all other operators (on the feedback-busses). Without this, an
+;; individual operator would only be able to use the output of operators
+;; defined after it was. This works because feedback-synth uses the
+;; in-feedback ugen.
+(def feedback-synths (vec (for [i (range num-operators)]
+                        (feedback-synth [:head fm-early-g]
+                                        :inbus (fm-mod-buses i)
+                                        :outbus (feedback-buses i))
+                        )))
+
+(defonce base-freq-bus (control-bus 1 "base-freq-bus"))
+(control-bus-set! base-freq-bus 110)
+
+;; Creates a vector of num-operators vectors with each internal vector
+;; having num-cntl-buses control-buses
+(def cntl-buses
+  (vec (for [opr (range num-operators)]
+         (vec (for [c-bus (range num-cntl-buses)]
+                (control-bus)))
+         ))
+  )
+
+(defsynth cntl-synth
+  [
+   out-bus 0
+   freq-ratio 1
+   out-mod-lvl 0.5
+   volume 1
+   morph-time 1
+   ]
+  (let [fr (lag3:kr freq-ratio morph-time)
+        o-ml (lag3:kr out-mod-lvl morph-time)
+        vol (lag3:kr volume morph-time)
+        ]
+    (out:kr out-bus [fr o-ml vol])
+    )
+  )
+
+(def cntl-parms [
+                {:freq-ratio 1 :out-mod-lvl 1 :vol 1}
+                {:freq-ratio 2.0 :out-mod-lvl 500 :vol 0}
+                ])
+
+(def cntl-synths
+  (vec (for [i (range num-operators)]
+         (let [parms (cntl-parms i)]
+           (cntl-synth [:head fm-early-g]
+                       ((cntl-buses i) 0)
+                       (:freq-ratio parms)
+                       (:out-mod-lvl parms)
+                       (:vol parms)
+                       ))
+         ))
+  )
+
+(defsynth fm-oper
+  [
+   b-freq-bus 1
+   in-mod-bus 3
+   out-mod-bus 2
+   freq-ratio-bus 6
+   out-mod-lvl-bus 7
+   vol 1
+   action NO-ACTION
+   gate 0
+   ]
+  (let [envelope (env-gen (perc 3.0 3.0) gate 1 0 1 action)
+        out-osc (* (sin-osc :freq (+ (* (in:kr b-freq-bus)
+                                        (in:kr freq-ratio-bus))
+                                     (in:ar in-mod-bus)))
+                   envelope
+                   )
+        ]
+    (out out-mod-bus (* out-osc (in:kr out-mod-lvl-bus)))
+    (out main-audio-bus (* out-osc (in:kr vol)))
+    ))
+
+(def fm-voice
+  (for [oper-id (range num-operators)]
+    (fm-oper [:tail fm-early-g]
+             :b-freq-bus base-freq-bus
+             :in-mod-bus (feedback-buses oper-id)
+             :out-mod-bus (fm-mod-buses (mod (inc oper-id) num-operators))
+             :freq-ratio-bus ((cntl-buses oper-id) 0)
+             :out-mod-lvl-bus ((cntl-buses oper-id) 1)
+             :vol ((cntl-buses oper-id) 2)
+     )
+    )
+  )
+
+(for [oper fm-voice]
+  (ctl oper :gate 1 :action FREE)
+  )
+
+(ctl (cntl-synths 0) :freq-ratio 1)
+(ctl (cntl-synths 0) :out-mod-lvl 0)
+(ctl (cntl-synths 0) :volume 1)
+(ctl (cntl-synths 1) :freq-ratio 0.01)
+(ctl (cntl-synths 1) :out-mod-lvl 500)
+(ctl (cntl-synths 1) :volume 0)
+(control-bus-get ((cntl-buses 0) 0))
+(control-bus-get ((cntl-buses 0) 1))
+(control-bus-get ((cntl-buses 0) 2))
+(control-bus-get ((cntl-buses 1) 0))
+(control-bus-get ((cntl-buses 1) 1))
+(control-bus-get ((cntl-buses 1) 2))
+(control-bus-set! base-freq-bus 110)
+(stop)
+
+(defsynth tsynth
+  []
+  (let [envelope (env-gen (perc 1.0 1.0) 1 1 0 1 FREE)]
+    (out main-audio-bus
+           (* (sin-osc :freq (in:kr base-freq-bus)) envelope)
+           ))
+  )
+
+(def synthtest (tsynth [:tail fm-early-g]))
+
+(defsynth tsynth2
+  []
+  (let [envelope (env-gen (perc 1.0 1.0) 1 1 0 1 FREE)
+        osc1 (* (sin-osc :freq 440) envelope)
+        osc2 (* (sin-osc :freq 110) envelope)
+        ]
+    (out 0 [osc1 osc2]
+         ))
+  )
+
+(def synthtest2 (tsynth2 [:tail fm-early-g]))
+
+;;---------------------------------------------------------
