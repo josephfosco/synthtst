@@ -178,9 +178,6 @@
     (out:ar outbus input)
     ))
 
-(defonce base-freq-bus (control-bus 1 "base-freq-bus"))
-(control-bus-set! base-freq-bus 110)
-
 ;; feedback-synths move audio data from the fm-mod-busses to the
 ;; feedback-busses. This is done so that all operators can access the output
 ;; of all other operators (on the feedback-busses). Without this, an
@@ -192,6 +189,9 @@
                                         :inbus (fm-mod-buses i)
                                         :outbus (feedback-buses i))
                         )))
+
+(defonce base-freq-bus (control-bus 1 "base-freq-bus"))
+(control-bus-set! base-freq-bus 110)
 
 ;; Creates a vector of num-operators vectors with each internal vector
 ;; having num-cntl-buses control-buses
@@ -223,8 +223,6 @@
                 {:freq-ratio 2.0 :out-mod-lvl 500 :vol 0}
                 ])
 
-(def the-base-freq 110)
-
 (def cntl-synths
   (vec (for [i (range num-operators)]
          (let [parms (cntl-parms i)]
@@ -252,7 +250,7 @@
         out-osc (* (sin-osc :freq (+ (* (in:kr b-freq-bus)
                                         (in:kr freq-ratio-bus))
                                      (in:ar in-mod-bus)))
-                   (* envelope 1)
+                   envelope
                    )
         ]
     (out out-mod-bus (* out-osc (in:kr out-mod-lvl-bus)))
@@ -280,9 +278,20 @@
   (ctl oper1 :gate 1 :action FREE)
   (ctl oper2 :gate 1 :action FREE)
   )
+
+(ctl (cntl-synths 0) :freq-ratio 1)
+(ctl (cntl-synths 0) :out-mod-lvl 0)
+(ctl (cntl-synths 0) :volume 1)
 (ctl (cntl-synths 1) :freq-ratio 0.01)
+(ctl (cntl-synths 1) :out-mod-lvl 500)
+(ctl (cntl-synths 1) :volume 0)
+(control-bus-get ((cntl-buses 0) 0))
+(control-bus-get ((cntl-buses 0) 1))
+(control-bus-get ((cntl-buses 0) 2))
+(control-bus-get ((cntl-buses 1) 0))
 (control-bus-get ((cntl-buses 1) 1))
-(control-bus-set! base-freq-bus 220)
+(control-bus-get ((cntl-buses 1) 2))
+(control-bus-set! base-freq-bus 110)
 (stop)
 
 (defsynth tsynth
