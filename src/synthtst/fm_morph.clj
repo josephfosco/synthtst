@@ -334,7 +334,7 @@
 (def fm-main-out (main-out-synth [:tail fm-later-g]))
 
 (def num-operators 2)
-(def num-cntl-buses 3)
+(def num-cntl-buses 10)
 
 (defonce fm-mod-buses (vec (for [i (range num-operators)]
                               (audio-bus 1 (str "fm-mod-bus" i)))))
@@ -371,25 +371,52 @@
          ))
   )
 
+;; These indexes must match the order the control-buses are listed in the
+;; "out:kr" statement of the cntl-synth
+(def out-mod-lvl0-ndx 0)
+(def out-mod-lvl1-ndx 1)
+(def out-mod-lvl2-ndx 2)
+(def out-mod-lvl3-ndx 3)
+(def out-mod-lvl4-ndx 4)
+(def out-mod-lvl5-ndx 5)
+(def out-mod-lvl6-ndx 6)
+(def out-mod-lvl7-ndx 7)
+(def freq-ratio-ndx 8)
+(def volume-ndx 9)
+
 (defsynth cntl-synth
   [
    out-bus 0
+   out-mod-lvl0 0
+   out-mod-lvl1 0
+   out-mod-lvl2 0
+   out-mod-lvl3 0
+   out-mod-lvl4 0
+   out-mod-lvl5 0
+   out-mod-lvl6 0
+   out-mod-lvl7 0
    freq-ratio 1
-   out-mod-lvl 0.5
    volume 1
    morph-time 1
    ]
   (let [fr (lag3:kr freq-ratio morph-time)
-        o-ml (lag3:kr out-mod-lvl morph-time)
+        o-ml0 (lag3:kr out-mod-lvl0 morph-time)
+        o-ml1 (lag3:kr out-mod-lvl1 morph-time)
+        o-ml2 (lag3:kr out-mod-lvl2 morph-time)
+        o-ml3 (lag3:kr out-mod-lvl3 morph-time)
+        o-ml4 (lag3:kr out-mod-lvl4 morph-time)
+        o-ml5 (lag3:kr out-mod-lvl5 morph-time)
+        o-ml6 (lag3:kr out-mod-lvl6 morph-time)
+        o-ml7 (lag3:kr out-mod-lvl7 morph-time)
         vol (lag3:kr volume morph-time)
         ]
-    (out:kr out-bus [fr o-ml vol])
+    (out:kr out-bus [o-ml0 o-ml1 o-ml2 o-ml3 o-ml4 o-ml5 o-ml6 o-ml7 fr vol])
     )
   )
 
 (def cntl-parms [
-                {:freq-ratio 1 :out-mod-lvl 1 :vol 1}
-                {:freq-ratio 2.0 :out-mod-lvl 500 :vol 0}
+                {:freq-ratio 1 :out-mod-lvl0 0 :out-mod-lvl1 0 :vol 1}
+                {:freq-ratio 2.0 :out-mod-lvl0 500 :out-mod-lvl1 0 :vol 0}
                 ])
 
 (def cntl-synths
@@ -397,8 +424,15 @@
          (let [parms (cntl-parms i)]
            (cntl-synth [:head fm-early-g]
                        ((cntl-buses i) 0)
+                       (or (:out-mod-lvl0 parms) 0)
+                       (or (:out-mod-lvl1 parms) 0)
+                       (or (:out-mod-lvl2 parms) 0)
+                       (or (:out-mod-lvl3 parms) 0)
+                       (or (:out-mod-lvl4 parms) 0)
+                       (or (:out-mod-lvl5 parms) 0)
+                       (or (:out-mod-lvl6 parms) 0)
+                       (or (:out-mod-lvl7 parms) 0)
                        (:freq-ratio parms)
-                       (:out-mod-lvl parms)
                        (:vol parms)
                        ))
          ))
@@ -409,8 +443,15 @@
    b-freq-bus 1
    in-mod-bus 3
    out-mod-bus 2
+   out-mod-lvl-bus0 7
+   out-mod-lvl-bus1 7
+   out-mod-lvl-bus2 7
+   out-mod-lvl-bus3 7
+   out-mod-lvl-bus4 7
+   out-mod-lvl-bus5 7
+   out-mod-lvl-bus6 7
+   out-mod-lvl-bus7 7
    freq-ratio-bus 6
-   out-mod-lvl-bus 7
    vol 1
    action NO-ACTION
    gate 0
@@ -422,7 +463,9 @@
                    envelope
                    )
         ]
-    (out out-mod-bus (* out-osc (in:kr out-mod-lvl-bus)))
+    (out out-mod-bus
+         [(* out-osc (in:kr out-mod-lvl-bus0))
+          (* out-osc (in:kr out-mod-lvl-bus1))])
     (out main-audio-bus (* out-osc (in:kr vol)))
     ))
 
@@ -431,13 +474,14 @@
     (fm-oper [:tail fm-early-g]
              :b-freq-bus base-freq-bus
              :in-mod-bus (feedback-buses oper-id)
-             :out-mod-bus (fm-mod-buses (mod (inc oper-id) num-operators))
-             :freq-ratio-bus ((cntl-buses oper-id) 0)
-             :out-mod-lvl-bus ((cntl-buses oper-id) 1)
-             :vol ((cntl-buses oper-id) 2)
-     )
-    )
-  )
+             :out-mod-bus (fm-mod-buses 0)
+             :out-mod-lvl-bus0 ((cntl-buses oper-id) out-mod-lvl0-ndx)
+             :out-mod-lvl-bus1 ((cntl-buses oper-id) out-mod-lvl1-ndx)
+             :freq-ratio-bus ((cntl-buses oper-id) freq-ratio-ndx)
+             :vol ((cntl-buses oper-id) volume-ndx)
+
+             )
+    ))
 
 (for [oper fm-voice]
   (ctl oper :gate 1 :action FREE)
@@ -459,25 +503,86 @@
 (stop)
 
 (defsynth tsynth
-  []
+  [freq 220]
   (let [envelope (env-gen (perc 1.0 1.0) 1 1 0 1 FREE)]
-    (out main-audio-bus
-           (* (sin-osc :freq (in:kr base-freq-bus)) envelope)
+    (out [0 1]
+           (* (sin-osc :freq freq) envelope)
            ))
   )
 
-(def synthtest (tsynth [:tail fm-early-g]))
-
-(defsynth tsynth2
-  []
-  (let [envelope (env-gen (perc 1.0 1.0) 1 1 0 1 FREE)
-        osc1 (* (sin-osc :freq 440) envelope)
-        osc2 (* (sin-osc :freq 110) envelope)
-        ]
-    (out 0 [osc1 osc2]
-         ))
-  )
-
-(def synthtest2 (tsynth2 [:tail fm-early-g]))
+(def synthtest (tsynth :freq 110))
 
 ;;---------------------------------------------------------
+(def test-list '(1 2 3 4))
+
+(defmacro test-macro
+  []
+  (let [arg-list (list 1 2 3 4)]
+     `(the-test ~@arg-list)
+     ))
+(:id base-freq-bus)
+
+(defsynth tm-synth
+  [freq-bus 1]
+  (let [envelope (env-gen (perc 1.0 1.0) 1 1 0 1 FREE)]
+    (out [0 1]
+         (* (sin-osc :freq (in:kr freq-bus)) envelope)
+           ))
+  )
+
+(def ms (tm-synth :freq-bus (:id base-freq-bus)))
+
+
+
+;; (def tfreq-buses [(control-bus 1 "freq-bus-t0") (control-bus 1 "freq-bus-t1")])
+;; (control-bus-set! (tfreq-buses 0) 110)
+;; (control-bus-set! (tfreq-buses 1) 220)
+;; (def tnum-out-buses 2)
+
+;; (defmacro make-tm-synth
+;;   [freq-buses]
+;;   `(defsynth tm-synth
+;;      [out-bus-num 0
+;;       ~@(flatten (for [freq-bus-num (range 2)]
+;;                    `(~(symbol (str "freq-bus" freq-bus-num)) ~freq-bus-num)))
+;;       ]
+;;      (let [envel# (env-gen (perc 1.0 1.0) 1 1 0 1 FREE)]
+;;        (out out-bus-num
+;;             [~(for [bus (range tnum-out-buses)]
+;;                 `(* (sin-osc :freq (in:kr (:id ~(symbol (str "freq-bus" bus)))))
+;;                     envel#))
+;;              ]
+;;             ))
+;;      )
+;;   )
+
+;; (make-tm-synth)
+
+;; (defsynth tmt-synth
+;;   [synth-num 0
+;;    out-bus-num 0
+;;    freq-bus-num (:id (tfreq-buses 0))
+;;    num-freq-buses (count tfreq-buses)
+;;    ]
+;;   (let [envel (env-gen (perc 1.0 1.0) 1 1 0 1 FREE)]
+;;     (out out-bus-num
+;;          [(* (sin-osc :freq
+;;                       (in:kr (mod (+ freq-bus-num synth-num 0)
+;;                                   num-freq-buses)))
+;;              envel)
+;;           (* (sin-osc :freq
+;;                       (in:kr (mod (+ freq-bus-num synth-num 1)
+;;                              num-freq-buses)))
+;;              envel)
+;;           ]
+;;          ))
+;;   )
+
+;; ;; out put buses
+;; ;; (+ (mod (+ synth_num bus_iteration 1) num_synths) first_bus_num)
+
+;; (def tmt-s-inst
+;;   (tmt-synth
+;;    :out-bus-num 0
+;;    :freq-bus-num (:id (tfreq-buses 0)))
+;;   )
