@@ -333,7 +333,7 @@
 
 (def fm-main-out (main-out-synth [:tail fm-later-g]))
 
-(def num-operators 2)
+(def num-operators 3)
 (def num-cntl-buses 10)
 
 (defonce fm-mod-buses (vec (for [i (range num-operators)]
@@ -399,24 +399,27 @@
    volume 1
    morph-time 1
    ]
-  (let [fr (lag3:kr freq-ratio morph-time)
-        o-ml0 (lag3:kr out-mod-lvl0 morph-time)
-        o-ml1 (lag3:kr out-mod-lvl1 morph-time)
-        o-ml2 (lag3:kr out-mod-lvl2 morph-time)
-        o-ml3 (lag3:kr out-mod-lvl3 morph-time)
-        o-ml4 (lag3:kr out-mod-lvl4 morph-time)
-        o-ml5 (lag3:kr out-mod-lvl5 morph-time)
-        o-ml6 (lag3:kr out-mod-lvl6 morph-time)
-        o-ml7 (lag3:kr out-mod-lvl7 morph-time)
-        vol (lag3:kr volume morph-time)
-        ]
-    (out:kr out-bus [o-ml0 o-ml1 o-ml2 o-ml3 o-ml4 o-ml5 o-ml6 o-ml7 fr vol])
+  (when out-bus
+    (let [fr (lag3:kr freq-ratio morph-time)
+          o-ml0 (lag3:kr out-mod-lvl0 morph-time)
+          o-ml1 (lag3:kr out-mod-lvl1 morph-time)
+          o-ml2 (lag3:kr out-mod-lvl2 morph-time)
+          o-ml3 (lag3:kr out-mod-lvl3 morph-time)
+          o-ml4 (lag3:kr out-mod-lvl4 morph-time)
+          o-ml5 (lag3:kr out-mod-lvl5 morph-time)
+          o-ml6 (lag3:kr out-mod-lvl6 morph-time)
+          o-ml7 (lag3:kr out-mod-lvl7 morph-time)
+          vol (lag3:kr volume morph-time)
+          ]
+      (out:kr out-bus [o-ml0 o-ml1 o-ml2 o-ml3 o-ml4 o-ml5 o-ml6 o-ml7 fr vol])
+      )
     )
   )
 
 (def cntl-parms [
-                {:freq-ratio 1 :out-mod-lvl0 0 :out-mod-lvl1 0 :vol 1}
-                {:freq-ratio 2.0 :out-mod-lvl0 500 :out-mod-lvl1 0 :vol 0}
+                {:out-mod-lvl0 0 :out-mod-lvl1 0 :freq-ratio 1 :vol 1}
+                {:out-mod-lvl0 0 :out-mod-lvl1 0 :freq-ratio 7 :vol 0}
+                {:out-mod-lvl0 0 :out-mod-lvl1 0 :freq-ratio 1.42 :vol 0}
                 ])
 
 (def cntl-synths
@@ -456,7 +459,7 @@
    action NO-ACTION
    gate 0
    ]
-  (let [envelope (env-gen (perc 3.0 3.0) gate 1 0 1 action)
+  (let [envelope (env-gen (perc 5.0 5.0) gate 1 0 1 action)
         out-osc (* (sin-osc :freq (+ (* (in:kr b-freq-bus)
                                         (in:kr freq-ratio-bus))
                                      (in:ar in-mod-bus)))
@@ -490,9 +493,10 @@
 (ctl (cntl-synths 0) :freq-ratio 1)
 (ctl (cntl-synths 0) :out-mod-lvl 0)
 (ctl (cntl-synths 0) :volume 1)
-(ctl (cntl-synths 1) :freq-ratio 0.01)
-(ctl (cntl-synths 1) :out-mod-lvl 500)
+(ctl (cntl-synths 1) :freq-ratio 2)
+(ctl (cntl-synths 1) :out-mod-lvl0 200)
 (ctl (cntl-synths 1) :volume 0)
+(ctl (cntl-synths 2) :out-mod-lvl0 0)
 (control-bus-get ((cntl-buses 0) 0))
 (control-bus-get ((cntl-buses 0) 1))
 (control-bus-get ((cntl-buses 0) 2))
