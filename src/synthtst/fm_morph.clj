@@ -779,8 +779,8 @@
          mod-lvl5
          mod-lvl6
          mod-lvl7
-         vol
          freq-ratio
+         vol
          ] (in:kr cntl-bus num-cntl-buses)
         envelope (env-gen (perc 5.0 5.0) gate 1 0 1 action)
         out-osc (* (sin-osc :freq (+ (* (in:kr base-freq-bus) freq-ratio)
@@ -816,7 +816,7 @@
 (ctl (cntl-synths 1) :freq-ratio 1.42)
 (ctl (cntl-synths 1) :out-mod-lvl0 500)
 (ctl (cntl-synths 1) :volume 0)
-(ctl (cntl-synths 2) :out-mod-lvl0 0)
+(ctl (mod-lvl-synths 2) :out-mod-lvl1 0.0)
 (control-bus-get ((cntl-buses 0) 0))
 (control-bus-get ((cntl-buses 0) 1))
 (control-bus-get ((cntl-buses 0) 2))
