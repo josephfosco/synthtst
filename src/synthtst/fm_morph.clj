@@ -692,46 +692,59 @@
 
 (def cntl-parms [
                  {:out-mod-lvl0 0   :out-mod-lvl1 0
-                  :out-mod-lvl2 0
+                  :out-mod-lvl2 0   :out-mod-lvl3 0
+                  :out-mod-lvl4 0   :out-mod-lvl5 0
+                  :out-mod-lvl6 0   :out-mod-lvl7 0
                   :freq-ratio 1 :vol 1
                   }
                  {:out-mod-lvl0 500 :out-mod-lvl1 0
-                  :out-mod-lvl2 0
+                  :out-mod-lvl2 0   :out-mod-lvl3 0
+                  :out-mod-lvl4 0   :out-mod-lvl5 0
+                  :out-mod-lvl6 0   :out-mod-lvl7 0
                   :freq-ratio 2 :vol 0
                   }
                  {:out-mod-lvl0 0   :out-mod-lvl1 400
-                  :out-mod-lvl2 0
+                  :out-mod-lvl2 0   :out-mod-lvl3 0
+                  :out-mod-lvl4 0   :out-mod-lvl5 0
+                  :out-mod-lvl6 0   :out-mod-lvl7 0
                   :freq-ratio 3 :vol 0
                   }
                  {:out-mod-lvl0 0   :out-mod-lvl1 0
-                  :out-mod-lvl2 300
+                  :out-mod-lvl2 300 :out-mod-lvl3 0
+                  :out-mod-lvl4 0   :out-mod-lvl5 0
+                  :out-mod-lvl6 0   :out-mod-lvl7 0
                   :freq-ratio 4 :vol 0
                   }
                  {:out-mod-lvl0 0   :out-mod-lvl1 0
-                  :out-mod-lvl2 0
+                  :out-mod-lvl2 0   :out-mod-lvl3 200
+                  :out-mod-lvl4 0   :out-mod-lvl5 0
+                  :out-mod-lvl6 0   :out-mod-lvl7 0
                   :freq-ratio 5 :vol 0
                   }
                  {:out-mod-lvl0 0   :out-mod-lvl1 0
-                  :out-mod-lvl2 0
+                  :out-mod-lvl2 0   :out-mod-lvl3 0
+                  :out-mod-lvl4 100 :out-mod-lvl5 0
+                  :out-mod-lvl6 0   :out-mod-lvl7 0
                   :freq-ratio 6 :vol 0
                   }
                  {:out-mod-lvl0 0   :out-mod-lvl1 0
-                  :out-mod-lvl2 0
+                  :out-mod-lvl2 0   :out-mod-lvl3 0
+                  :out-mod-lvl4 0   :out-mod-lvl5 75
+                  :out-mod-lvl6 0   :out-mod-lvl7 0
                   :freq-ratio 7 :vol 0
                   }
                  {:out-mod-lvl0 0   :out-mod-lvl1 0
-                  :out-mod-lvl2 0
+                  :out-mod-lvl2 0   :out-mod-lvl3 0
+                  :out-mod-lvl4 0   :out-mod-lvl5 0
+                  :out-mod-lvl6 50  :out-mod-lvl7 0
                   :freq-ratio 8 :vol 0
                   }
                 ])
 
-; These indexes must match the order the control-buses are listed in the
-;; "out:kr" statement of the cntl-synth
-(def out-mod-lvl0-ndx 0)
-(def out-mod-lvl1-ndx 1)
-(def out-mod-lvl2-ndx 2)
-(def freq-ratio-ndx 8)
-(def volume-ndx 9)
+; These indexes must match the order of the control-buses The specific -ndx(s)
+;; are used in the various control synths to set a base for their outputs
+(def base-mod-lvl-bus-ndx 0)
+(def base-cntl-bus-ndx 8)
 
 (def mod-lvl-synths
   (vec (for [i (range num-operators)]
@@ -753,7 +766,7 @@
 (def cntl-synths
   (vec (for [i (range num-operators)]
          (let [parms (cntl-parms i)
-               cntl-bus-num (+ (:id (cntl-buses i)) freq-ratio-ndx)]
+               cntl-bus-num (+ (:id (cntl-buses i)) base-cntl-bus-ndx)]
            (cntl-synth [:head fm-early-g]
                        cntl-bus-num
                        (:freq-ratio parms)
@@ -793,8 +806,13 @@
              (* out-osc mod-lvl0)
              (* out-osc mod-lvl1)
              (* out-osc mod-lvl2)
+             (* out-osc mod-lvl3)
+             (* out-osc mod-lvl4)
+             (* out-osc mod-lvl5)
+             (* out-osc mod-lvl6)
+             (* out-osc mod-lvl7)
              ])
-    (out:ar main-audio-bus (* out-osc vol))
+    (out:ar main-audio-bus (* out-osc (/ vol num-operators)))
     ))
 
 (def fm-voice
@@ -812,11 +830,12 @@
 
 (ctl (cntl-synths 0) :freq-ratio 1)
 (ctl (cntl-synths 0) :out-mod-lvl 0)
-(ctl (cntl-synths 0) :volume 1)
+(ctl (cntl-synths 0) :volume 0)
 (ctl (cntl-synths 1) :freq-ratio 1.42)
 (ctl (cntl-synths 1) :out-mod-lvl0 500)
-(ctl (cntl-synths 1) :volume 0)
-(ctl (mod-lvl-synths 2) :out-mod-lvl1 0.0)
+(ctl (cntl-synths 2) :volume 1)
+(ctl (mod-lvl-synths 2) :out-mod-lvl1 500.00)
+(ctl (mod-lvl-synths 7) :out-mod-lvl6 50.0)
 (control-bus-get ((cntl-buses 0) 0))
 (control-bus-get ((cntl-buses 0) 1))
 (control-bus-get ((cntl-buses 0) 2))
