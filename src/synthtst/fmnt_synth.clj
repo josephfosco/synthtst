@@ -37,6 +37,7 @@
   )
 
 (def f1 (fmnt))
+(def f1 (fmnt :attack 0.01 :decay 0.1 :sustain 0.0))
 (stop)
 
 (definst fmnt2 [freq 440 cfreq 880 bw 200.0 gate-val 0
@@ -208,6 +209,8 @@
   )
 
 (def f5 (fmnt5))
+(ctl f5 :attack 0.0)
+(ctl f5 :release 2.0)
 (stop)
 
 (definst fmnt6 [freq-bus 0 cfreq 880 bw 200.0
@@ -311,4 +314,37 @@
     ))
 
 (playl 0 45)
+(stop)
+
+
+(definst fmnt-rand [freq 440 bw 200.0
+                    attack 0.1 decay 0.2 sustain 0.6 release 0.7 vol 0.3
+                    impulse-rate 0.5 rand-range 400]
+  (let [cfreq (* freq 1.37)
+        env-impulse (impulse (* 2 impulse-rate))
+        env-ff (toggle-ff env-impulse)
+        env-gate (gate env-ff env-impulse)
+        env-generator (env-gen (env-adsr attack decay sustain release) env-gate 1 0 1)
+        freq-bus (control-bus)
+        ]
+    (out freq-bus (+ (* rand-range (latch (lf-noise0:kr) env-impulse)) freq))
+    (* env-generator
+       (formant (in:kr freq-bus)
+                (+ (* (in freq-bus) 1.37) (* (- env-generator 0.5) 1000))
+                (+ bw (* env-generator 500)))
+       vol
+       )
+    )
+  )
+
+(def f1 (fmnt-rand :impulse-rate 2))
+(def f1 (fmnt-rand
+         :freq 100
+         :attack 0.05
+         :decay 0.1
+         :sustain 0.6
+         :release 0.1
+         :impulse-rate 25
+         :rand-range 5000))
+(ctl f1 :impulse-rate 1)
 (stop)
