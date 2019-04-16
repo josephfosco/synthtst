@@ -1,4 +1,4 @@
-;    Copyright (C) 2018  Joseph Fosco. All Rights Reserved
+;    Copyright (C) 2018-2019  Joseph Fosco. All Rights Reserved
 ;
 ;    This program is free software: you can redistribute it and/or modify
 ;    it under the terms of the GNU General Public License as published by
@@ -539,3 +539,48 @@
 
 (many-synths 30 spark3-sound)
 (stop)
+
+
+;;-----------------------------------------------------------
+(def fltr-co-bus (control-bus))
+(defsynth fltr-co-synth [rel 0.5] (out fltr-co-bus (lf-saw (/ rel 1))))
+(def co-synth (fltr-co-synth))
+
+(definst xylo
+  [freq 440 vol 0.8 gate 1.0 eg-rel 0.55 action FREE]
+  (-> (pulse freq)
+      (lpf (* (* 3 freq) (in fltr-co-bus)))
+      (* (env-gen (perc 0.001 eg-rel) gate vol 0 1 action))
+      )
+
+  )
+
+(ctl co-synth :rel 0.55)
+(def xs (xylo 220))
+(ctl xs :gate 0)
+(stop)
+
+(definst marimba
+  [freq 440 vol 0.8 gate 1.0 action FREE]
+  (-> (sin-osc freq)
+      (* (env-gen (perc 0.001
+                        (let [rel (/ 220 freq)]
+                          (cond
+                            (<= 0.25 rel 1.0) rel
+                            (> rel 1.0) 1.0
+                            :else 0.25
+                            )
+                          )
+                        )
+                  gate
+                  vol
+                  0 1
+                  action))
+      )
+
+  )
+
+(float (/  500 440))
+(def marm (marimba 2637))
+
+(float (/ 110 220))

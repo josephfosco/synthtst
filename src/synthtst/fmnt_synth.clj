@@ -1,4 +1,4 @@
-;    Copyright (C) 2016, 2018  Joseph Fosco. All Rights Reserved
+;    Copyright (C) 2016, 2018-2019  Joseph Fosco. All Rights Reserved
 ;
 ;    This program is free software: you can redistribute it and/or modify
 ;    it under the terms of the GNU General Public License as published by
@@ -347,4 +347,48 @@
          :impulse-rate 25
          :rand-range 5000))
 (ctl f1 :impulse-rate 1)
+(stop)
+
+
+(definst fmt-tst
+  [fundfreq 440.0 formfreq 1760.0 bwfreq 880.0 vol 0.6]
+  (* (formant fundfreq formfreq bwfreq)
+     vol
+     )
+  )
+
+(def ft (fmt-tst :vol 0.4) )
+(stop)
+
+(defsynth fmt-tst
+  [fundfreq 440.0 bwfreq 880.0 vol 0.6 trig 1 action NO-ACTION
+   form-speed 10
+   atk 0.01 dcy 0.3 sus 0.8 rel 1
+   ]
+
+  (out [0 1]
+       (let [eg1 (env-gen (adsr atk dcy sus rel :curve :linear)
+                      trig
+                      :action action)]
+         (* (formant fundfreq
+                     (* eg1
+                        (+ (* fundfreq 1.5)
+                           (* fundfreq 0.1)
+                           (* (lag (+ (lf-noise0:ar form-speed) 1)
+                                   (/ 1 form-speed))
+                              fundfreq)))
+                     ;; formfreq
+                     ;;(+ bwfreq (* (+ (lf-noise0:kr 10) 1) 500) )
+                     (* (+ (lf-tri 3) 1) (* fundfreq 0.2))
+                     ;;bwfreq
+                     )
+            (* eg1
+               vol)
+            )))
+  )
+
+(def ft (fmt-tst :fundfreq 75 :vol 0.4 :bwfreq 100 :rel 10) )
+(ctl ft :trig 0)
+(ctl ft :trig 1 :form-speed 10)
+(ctl ft :trig 0 :action FREE)
 (stop)
